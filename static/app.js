@@ -172,27 +172,52 @@ function closeSchemaModal() {
     schemaModalOverlay.classList.remove('open');
 }
 
-// Relationships definition for drawing lines
-const RELATIONSHIPS = [
-    { from: 'orders', fromCol: 'customer_id', to: 'customers', toCol: 'id' },
-    { from: 'order_items', fromCol: 'order_id', to: 'orders', toCol: 'id' },
-    { from: 'order_items', fromCol: 'product_id', to: 'products', toCol: 'id' },
-    { from: 'products', fromCol: 'category_id', to: 'categories', toCol: 'id' },
-    { from: 'reviews', fromCol: 'product_id', to: 'products', toCol: 'id' },
-    { from: 'reviews', fromCol: 'customer_id', to: 'customers', toCol: 'id' },
-];
+// Build lookup: tableName → list of { col, refTable, refCol, direction }
+// direction: 'out' = this table has FK pointing to another, 'in' = another table points here
+function buildRelationMap(tables) {
+    const map = {}; // tableName -> []
+    tables.forEach(t => { map[t.name] = []; });
+
+    tables.forEach(table => {
+        table.columns.forEach(col => {
+            if (!col.references) return;
+            // references is e.g. "customers.id"
+            const [refTable, refCol] = col.references.split('.');
+            // Outgoing FK from this table
+            if (map[table.name]) {
+                map[table.name].push({
+                    direction: 'out',
+                    localCol: col.name,
+                    refTable,
+                    refCol: refCol || 'id',
+                });
+            }
+            // Incoming FK into the referenced table
+            if (map[refTable]) {
+                map[refTable].push({
+                    direction: 'in',
+                    localCol: refCol || 'id',
+                    refTable: table.name,
+                    refCol: col.name,
+                });
+            }
+        });
+    });
+    return map;
+}
 
 function renderERD(tables) {
     erdTables.innerHTML = '';
-    erdLines.innerHTML = '';
+    erdLines.innerHTML = ''; // kept in DOM but unused
 
-    // Render table cards
+    const relMap = buildRelationMap(tables);
+
     tables.forEach(table => {
         const card = document.createElement('div');
         card.className = 'erd-table-card';
         card.setAttribute('data-table', table.name);
 
-        // Header
+        // ── Header ──────────────────────────────────────────
         const head = document.createElement('div');
         head.className = 'erd-table-head';
         head.innerHTML = `
@@ -201,13 +226,16 @@ function renderERD(tables) {
         `;
         card.appendChild(head);
 
-        // Description
+        // ── Description ─────────────────────────────────────
         const desc = document.createElement('div');
         desc.className = 'erd-table-desc';
         desc.textContent = table.description;
         card.appendChild(desc);
 
-        // Columns
+        // ── Section label: Columns ───────────────────────────
+        card.appendChild(makeSectionLabel('Columns'));
+
+        // ── Columns ─────────────────────────────────────────
         const colsDiv = document.createElement('div');
         colsDiv.className = 'erd-columns';
 
@@ -217,138 +245,79 @@ function renderERD(tables) {
 
             const row = document.createElement('div');
             row.className = 'erd-col';
-            row.setAttribute('data-table', table.name);
-            row.setAttribute('data-col', col.name);
+            row.title = col.description || '';
 
-            // Icon
             const icon = document.createElement('span');
             icon.className = 'erd-col-icon ' + (isPK ? 'pk' : isFK ? 'fk' : 'regular');
             icon.textContent = isPK ? 'PK' : isFK ? 'FK' : '';
             row.appendChild(icon);
 
-            // Name
             const nameSpan = document.createElement('span');
             nameSpan.className = 'erd-col-name';
             nameSpan.textContent = col.name;
             row.appendChild(nameSpan);
 
-            // Type
             const typeSpan = document.createElement('span');
             typeSpan.className = 'erd-col-type';
             typeSpan.textContent = col.type;
             row.appendChild(typeSpan);
 
-            // FK reference
-            if (isFK) {
-                const refSpan = document.createElement('span');
-                refSpan.className = 'erd-col-ref';
-                refSpan.textContent = '\u2192 ' + col.references;
-                refSpan.title = 'Foreign key to ' + col.references;
-                row.appendChild(refSpan);
-            }
-
-            // Tooltip with description
-            if (col.description) {
-                row.title = col.description;
-            }
-
             colsDiv.appendChild(row);
         });
 
         card.appendChild(colsDiv);
+
+        // ── Relations section ────────────────────────────────
+        const rels = relMap[table.name] || [];
+        if (rels.length > 0) {
+            card.appendChild(makeSectionLabel('Relations'));
+
+            const relsDiv = document.createElement('div');
+            relsDiv.className = 'erd-relations';
+
+            rels.forEach(rel => {
+                const row = document.createElement('div');
+                row.className = 'erd-rel-row';
+
+                if (rel.direction === 'out') {
+                    // This table's FK points to another table
+                    row.innerHTML = `
+                        <span class="erd-rel-icon out" title="Foreign key out">&#x2192;</span>
+                        <span class="erd-rel-text">
+                            <span class="erd-rel-col">${rel.localCol}</span>
+                            <span class="erd-rel-arrow">links to</span>
+                            <span class="erd-rel-target">${rel.refTable}</span>
+                            <span class="erd-rel-arrow">.${rel.refCol}</span>
+                        </span>
+                    `;
+                } else {
+                    // Another table's FK points into this table
+                    row.innerHTML = `
+                        <span class="erd-rel-icon in" title="Referenced by">&#x2190;</span>
+                        <span class="erd-rel-text">
+                            <span class="erd-rel-target">${rel.refTable}</span>
+                            <span class="erd-rel-arrow">.${rel.refCol}</span>
+                            <span class="erd-rel-arrow"> references </span>
+                            <span class="erd-rel-col">${rel.localCol}</span>
+                        </span>
+                    `;
+                }
+
+                relsDiv.appendChild(row);
+            });
+
+            card.appendChild(relsDiv);
+        }
+
         erdTables.appendChild(card);
     });
-
-    // Draw relationship lines after layout settles
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => drawRelationshipLines());
-    });
-
-    // Redraw on resize
-    const resizeObserver = new ResizeObserver(() => drawRelationshipLines());
-    resizeObserver.observe(erdTables);
 }
 
-function drawRelationshipLines() {
-    erdLines.innerHTML = '';
-    const canvas = document.getElementById('erdCanvas');
-    if (!canvas) return;
-    const canvasRect = canvas.getBoundingClientRect();
-
-    // Size the SVG to fill the canvas
-    erdLines.setAttribute('width', canvas.scrollWidth);
-    erdLines.setAttribute('height', canvas.scrollHeight);
-    erdLines.style.width = canvas.scrollWidth + 'px';
-    erdLines.style.height = canvas.scrollHeight + 'px';
-
-    RELATIONSHIPS.forEach((rel, idx) => {
-        const fromCard = erdTables.querySelector(`[data-table="${rel.from}"]`);
-        const toCard = erdTables.querySelector(`[data-table="${rel.to}"]`);
-        if (!fromCard || !toCard) return;
-
-        // Find the FK column row in the source card
-        const fromRow = fromCard.querySelector(`[data-col="${rel.fromCol}"]`);
-        // Find the PK column row in the target card
-        const toRow = toCard.querySelector(`[data-col="${rel.toCol}"]`);
-        if (!fromRow || !toRow) return;
-
-        const fromRect = fromRow.getBoundingClientRect();
-        const toRect = toRow.getBoundingClientRect();
-
-        // Calculate positions relative to the canvas
-        const fromY = fromRect.top + fromRect.height / 2 - canvasRect.top + canvas.scrollTop;
-        const toY = toRect.top + toRect.height / 2 - canvasRect.top + canvas.scrollTop;
-
-        const fromCardRect = fromCard.getBoundingClientRect();
-        const toCardRect = toCard.getBoundingClientRect();
-
-        // Determine which side to connect from/to
-        let fromX, toX;
-        const fromCenterX = fromCardRect.left + fromCardRect.width / 2 - canvasRect.left;
-        const toCenterX = toCardRect.left + toCardRect.width / 2 - canvasRect.left;
-
-        if (fromCenterX < toCenterX) {
-            // Source is to the left of target
-            fromX = fromCardRect.right - canvasRect.left;
-            toX = toCardRect.left - canvasRect.left;
-        } else if (fromCenterX > toCenterX) {
-            // Source is to the right of target
-            fromX = fromCardRect.left - canvasRect.left;
-            toX = toCardRect.right - canvasRect.left;
-        } else {
-            // Same column — connect via the right side with a curve
-            fromX = fromCardRect.right - canvasRect.left;
-            toX = toCardRect.right - canvasRect.left;
-        }
-
-        // Draw a curved path
-        const midX = (fromX + toX) / 2;
-        const controlOffset = Math.max(40, Math.abs(fromX - toX) * 0.3);
-
-        let path;
-        if (fromCenterX === toCenterX) {
-            // Same column — curve out to the right
-            const bulge = 50;
-            path = `M ${fromX} ${fromY} C ${fromX + bulge} ${fromY}, ${toX + bulge} ${toY}, ${toX} ${toY}`;
-        } else {
-            path = `M ${fromX} ${fromY} C ${fromX + (toX > fromX ? controlOffset : -controlOffset)} ${fromY}, ${toX + (toX > fromX ? -controlOffset : controlOffset)} ${toY}, ${toX} ${toY}`;
-        }
-
-        const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        pathEl.setAttribute('d', path);
-        pathEl.setAttribute('class', 'erd-rel-line');
-        erdLines.appendChild(pathEl);
-
-        // Add dots at endpoints
-        [{ x: fromX, y: fromY }, { x: toX, y: toY }].forEach(pt => {
-            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            circle.setAttribute('cx', pt.x);
-            circle.setAttribute('cy', pt.y);
-            circle.setAttribute('r', 4);
-            circle.setAttribute('class', 'erd-rel-dot');
-            erdLines.appendChild(circle);
-        });
-    });
+function makeSectionLabel(text) {
+    const el = document.createElement('div');
+    el.className = 'erd-section-label';
+    el.textContent = text;
+    return el;
 }
 
 // ===== Chat =====

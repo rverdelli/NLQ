@@ -452,24 +452,94 @@ html, body {
     flex-shrink: 0;
 }
 
-.erd-col-ref {
-    font-size: 0.7rem;
-    color: var(--accent);
+/* Section label inside a card */
+.erd-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    padding: 6px 14px 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+}
+
+/* Relations section */
+.erd-relations {
+    padding: 2px 0 6px;
+}
+
+.erd-rel-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 14px;
+    font-size: 0.78rem;
+    transition: background 0.1s;
+}
+
+.erd-rel-row:hover {
+    background: var(--accent-subtle);
+}
+
+.erd-rel-icon {
     flex-shrink: 0;
-    cursor: help;
+    font-size: 0.9rem;
+    font-weight: 700;
+    width: 18px;
+    text-align: center;
+    border-radius: 3px;
+    padding: 1px 3px;
 }
 
-/* Relationship lines drawn on SVG */
-.erd-rel-line {
-    stroke: var(--accent);
-    stroke-width: 2;
-    stroke-dasharray: 6, 4;
-    fill: none;
-    opacity: 0.6;
+.erd-rel-icon.out {
+    color: #6366f1;
+    background: rgba(99, 102, 241, 0.12);
 }
 
-.erd-rel-dot {
-    fill: var(--accent);
+.erd-rel-icon.in {
+    color: #14b8a6;
+    background: rgba(20, 184, 166, 0.12);
+}
+
+.erd-rel-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px;
+    line-height: 1.5;
+}
+
+.erd-rel-col {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.erd-rel-target {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent-hover);
+    font-weight: 600;
+}
+
+.erd-rel-arrow {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
+/* Legend items for the new style */
+.legend-rel-out {
+    font-weight: 700;
+    color: #6366f1;
+    font-size: 1rem;
+}
+
+.legend-rel-in {
+    font-weight: 700;
+    color: #14b8a6;
+    font-size: 1rem;
 }
 
 /* ===== Responsive ERD ===== */
