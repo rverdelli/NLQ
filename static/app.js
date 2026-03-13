@@ -9,8 +9,12 @@ const sendBtn = document.getElementById('sendBtn');
 const welcomeCard = document.getElementById('welcomeCard');
 const welcomeExamples = document.getElementById('welcomeExamples');
 const sidebarSuggestions = document.getElementById('sidebarSuggestions');
-const schemaExplorer = document.getElementById('schemaExplorer');
 const sidebar = document.getElementById('sidebar');
+const schemaModalBtn = document.getElementById('schemaModalBtn');
+const schemaModalOverlay = document.getElementById('schemaModalOverlay');
+const schemaModalClose = document.getElementById('schemaModalClose');
+const erdTables = document.getElementById('erdTables');
+const erdLines = document.getElementById('erdLines');
 const sidebarToggle = document.getElementById('sidebarToggle');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
 const themeToggle = document.getElementById('themeToggle');
@@ -24,12 +28,15 @@ const exampleQuestions = [
     "Compare marketing campaign ROI",
 ];
 
+// ===== Schema data cache =====
+let schemaData = null;
+
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     renderWelcomeExamples();
     loadSidebarSuggestions();
-    loadSchemaExplorer();
+    prefetchSchema();
     setupEventListeners();
 });
 
@@ -88,6 +95,18 @@ function setupEventListeners() {
             if (q) askQuestion(q);
         });
     });
+
+    // Schema modal
+    schemaModalBtn.addEventListener('click', openSchemaModal);
+    schemaModalClose.addEventListener('click', closeSchemaModal);
+    schemaModalOverlay.addEventListener('click', (e) => {
+        if (e.target === schemaModalOverlay) closeSchemaModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && schemaModalOverlay.classList.contains('open')) {
+            closeSchemaModal();
+        }
+    });
 }
 
 // ===== Welcome Examples =====
@@ -125,48 +144,210 @@ async function loadSidebarSuggestions() {
     }
 }
 
-// ===== Schema Explorer =====
-async function loadSchemaExplorer() {
+// ===== Schema Modal & ERD =====
+async function prefetchSchema() {
     try {
         const res = await fetch('/api/schema');
         const data = await res.json();
-        renderSchema(data.tables);
+        schemaData = data.tables;
     } catch (e) {
-        schemaExplorer.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;">Could not load schema.</p>';
+        // Will retry when modal opens
     }
 }
 
-function renderSchema(tables) {
-    schemaExplorer.innerHTML = '';
+function openSchemaModal() {
+    schemaModalOverlay.classList.add('open');
+    if (schemaData) {
+        renderERD(schemaData);
+    } else {
+        erdTables.innerHTML = '<p style="color:var(--text-muted);padding:40px;text-align:center;">Loading schema...</p>';
+        prefetchSchema().then(() => {
+            if (schemaData) renderERD(schemaData);
+            else erdTables.innerHTML = '<p style="color:var(--error);padding:40px;text-align:center;">Could not load schema.</p>';
+        });
+    }
+}
+
+function closeSchemaModal() {
+    schemaModalOverlay.classList.remove('open');
+}
+
+// Relationships definition for drawing lines
+const RELATIONSHIPS = [
+    { from: 'orders', fromCol: 'customer_id', to: 'customers', toCol: 'id' },
+    { from: 'order_items', fromCol: 'order_id', to: 'orders', toCol: 'id' },
+    { from: 'order_items', fromCol: 'product_id', to: 'products', toCol: 'id' },
+    { from: 'products', fromCol: 'category_id', to: 'categories', toCol: 'id' },
+    { from: 'reviews', fromCol: 'product_id', to: 'products', toCol: 'id' },
+    { from: 'reviews', fromCol: 'customer_id', to: 'customers', toCol: 'id' },
+];
+
+function renderERD(tables) {
+    erdTables.innerHTML = '';
+    erdLines.innerHTML = '';
+
+    // Render table cards
     tables.forEach(table => {
-        const div = document.createElement('div');
-        div.className = 'schema-table';
+        const card = document.createElement('div');
+        card.className = 'erd-table-card';
+        card.setAttribute('data-table', table.name);
 
-        const header = document.createElement('button');
-        header.className = 'schema-table-header';
-        header.innerHTML = `
-            <span>${table.name} <span class="schema-row-count">(${table.row_count})</span></span>
-            <span class="arrow">&#9654;</span>
+        // Header
+        const head = document.createElement('div');
+        head.className = 'erd-table-head';
+        head.innerHTML = `
+            <span class="erd-table-name">${table.name}</span>
+            <span class="erd-table-count">${table.row_count.toLocaleString()} rows</span>
         `;
-        header.addEventListener('click', () => div.classList.toggle('open'));
+        card.appendChild(head);
 
-        const body = document.createElement('div');
-        body.className = 'schema-table-body';
+        // Description
+        const desc = document.createElement('div');
+        desc.className = 'erd-table-desc';
+        desc.textContent = table.description;
+        card.appendChild(desc);
+
+        // Columns
+        const colsDiv = document.createElement('div');
+        colsDiv.className = 'erd-columns';
+
         table.columns.forEach(col => {
+            const isPK = col.name === 'id';
+            const isFK = !!col.references;
+
             const row = document.createElement('div');
-            row.className = 'schema-column';
-            let content = `<span class="schema-col-name">${col.name}</span><span class="schema-col-type">${col.type}</span>`;
-            if (col.references) {
-                content += `<span class="schema-col-ref">&rarr; ${col.references}</span>`;
+            row.className = 'erd-col';
+            row.setAttribute('data-table', table.name);
+            row.setAttribute('data-col', col.name);
+
+            // Icon
+            const icon = document.createElement('span');
+            icon.className = 'erd-col-icon ' + (isPK ? 'pk' : isFK ? 'fk' : 'regular');
+            icon.textContent = isPK ? 'PK' : isFK ? 'FK' : '';
+            row.appendChild(icon);
+
+            // Name
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'erd-col-name';
+            nameSpan.textContent = col.name;
+            row.appendChild(nameSpan);
+
+            // Type
+            const typeSpan = document.createElement('span');
+            typeSpan.className = 'erd-col-type';
+            typeSpan.textContent = col.type;
+            row.appendChild(typeSpan);
+
+            // FK reference
+            if (isFK) {
+                const refSpan = document.createElement('span');
+                refSpan.className = 'erd-col-ref';
+                refSpan.textContent = '\u2192 ' + col.references;
+                refSpan.title = 'Foreign key to ' + col.references;
+                row.appendChild(refSpan);
             }
-            row.innerHTML = content;
-            row.title = col.description;
-            body.appendChild(row);
+
+            // Tooltip with description
+            if (col.description) {
+                row.title = col.description;
+            }
+
+            colsDiv.appendChild(row);
         });
 
-        div.appendChild(header);
-        div.appendChild(body);
-        schemaExplorer.appendChild(div);
+        card.appendChild(colsDiv);
+        erdTables.appendChild(card);
+    });
+
+    // Draw relationship lines after layout settles
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => drawRelationshipLines());
+    });
+
+    // Redraw on resize
+    const resizeObserver = new ResizeObserver(() => drawRelationshipLines());
+    resizeObserver.observe(erdTables);
+}
+
+function drawRelationshipLines() {
+    erdLines.innerHTML = '';
+    const canvas = document.getElementById('erdCanvas');
+    if (!canvas) return;
+    const canvasRect = canvas.getBoundingClientRect();
+
+    // Size the SVG to fill the canvas
+    erdLines.setAttribute('width', canvas.scrollWidth);
+    erdLines.setAttribute('height', canvas.scrollHeight);
+    erdLines.style.width = canvas.scrollWidth + 'px';
+    erdLines.style.height = canvas.scrollHeight + 'px';
+
+    RELATIONSHIPS.forEach((rel, idx) => {
+        const fromCard = erdTables.querySelector(`[data-table="${rel.from}"]`);
+        const toCard = erdTables.querySelector(`[data-table="${rel.to}"]`);
+        if (!fromCard || !toCard) return;
+
+        // Find the FK column row in the source card
+        const fromRow = fromCard.querySelector(`[data-col="${rel.fromCol}"]`);
+        // Find the PK column row in the target card
+        const toRow = toCard.querySelector(`[data-col="${rel.toCol}"]`);
+        if (!fromRow || !toRow) return;
+
+        const fromRect = fromRow.getBoundingClientRect();
+        const toRect = toRow.getBoundingClientRect();
+
+        // Calculate positions relative to the canvas
+        const fromY = fromRect.top + fromRect.height / 2 - canvasRect.top + canvas.scrollTop;
+        const toY = toRect.top + toRect.height / 2 - canvasRect.top + canvas.scrollTop;
+
+        const fromCardRect = fromCard.getBoundingClientRect();
+        const toCardRect = toCard.getBoundingClientRect();
+
+        // Determine which side to connect from/to
+        let fromX, toX;
+        const fromCenterX = fromCardRect.left + fromCardRect.width / 2 - canvasRect.left;
+        const toCenterX = toCardRect.left + toCardRect.width / 2 - canvasRect.left;
+
+        if (fromCenterX < toCenterX) {
+            // Source is to the left of target
+            fromX = fromCardRect.right - canvasRect.left;
+            toX = toCardRect.left - canvasRect.left;
+        } else if (fromCenterX > toCenterX) {
+            // Source is to the right of target
+            fromX = fromCardRect.left - canvasRect.left;
+            toX = toCardRect.right - canvasRect.left;
+        } else {
+            // Same column — connect via the right side with a curve
+            fromX = fromCardRect.right - canvasRect.left;
+            toX = toCardRect.right - canvasRect.left;
+        }
+
+        // Draw a curved path
+        const midX = (fromX + toX) / 2;
+        const controlOffset = Math.max(40, Math.abs(fromX - toX) * 0.3);
+
+        let path;
+        if (fromCenterX === toCenterX) {
+            // Same column — curve out to the right
+            const bulge = 50;
+            path = `M ${fromX} ${fromY} C ${fromX + bulge} ${fromY}, ${toX + bulge} ${toY}, ${toX} ${toY}`;
+        } else {
+            path = `M ${fromX} ${fromY} C ${fromX + (toX > fromX ? controlOffset : -controlOffset)} ${fromY}, ${toX + (toX > fromX ? -controlOffset : controlOffset)} ${toY}, ${toX} ${toY}`;
+        }
+
+        const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathEl.setAttribute('d', path);
+        pathEl.setAttribute('class', 'erd-rel-line');
+        erdLines.appendChild(pathEl);
+
+        // Add dots at endpoints
+        [{ x: fromX, y: fromY }, { x: toX, y: toY }].forEach(pt => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', pt.x);
+            circle.setAttribute('cy', pt.y);
+            circle.setAttribute('r', 4);
+            circle.setAttribute('class', 'erd-rel-dot');
+            erdLines.appendChild(circle);
+        });
     });
 }
 

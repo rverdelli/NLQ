@@ -19,6 +19,10 @@
                 <span class="logo-subtitle">E-Commerce Analytics Assistant</span>
             </div>
             <div class="header-right">
+                <button class="schema-modal-btn" id="schemaModalBtn" aria-label="View data model">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    <span class="schema-btn-label">Data Model</span>
+                </button>
                 <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
                     <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                     <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -32,10 +36,6 @@
                 <div class="sidebar-section">
                     <h3 class="sidebar-title">Quick Questions</h3>
                     <div class="suggestion-list" id="sidebarSuggestions"></div>
-                </div>
-                <div class="sidebar-section">
-                    <h3 class="sidebar-title">Data Model Explorer</h3>
-                    <div class="schema-explorer" id="schemaExplorer"></div>
                 </div>
             </aside>
 
@@ -75,6 +75,32 @@
 
     <!-- Overlay for mobile sidebar -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Schema Modal -->
+    <div class="modal-overlay" id="schemaModalOverlay">
+        <div class="modal" id="schemaModal">
+            <div class="modal-header">
+                <h2 class="modal-title">Data Model Explorer</h2>
+                <p class="modal-subtitle">E-Commerce Database — tables, columns, and relationships</p>
+                <button class="modal-close" id="schemaModalClose" aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="erd-canvas" id="erdCanvas">
+                    <svg class="erd-lines" id="erdLines"></svg>
+                    <div class="erd-tables" id="erdTables"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="erd-legend">
+                    <span class="legend-item"><span class="legend-pk"></span> Primary Key</span>
+                    <span class="legend-item"><span class="legend-fk"></span> Foreign Key</span>
+                    <span class="legend-item"><svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4,3"/></svg> Relationship</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/app.js"></script>
 </body>
