@@ -404,10 +404,7 @@ async function sendMessage() {
         }
 
         // Stream ended — mark text step complete
-        if (textPreviewEl) {
-            textPreviewEl.classList.remove('streaming');
-            appendReasoningResult(textPreviewEl.parentElement, true, 'Response complete');
-        }
+        finaliseReasoningTextStep();
 
     } catch (e) {
         state.error = e.message;
@@ -450,7 +447,7 @@ function handleStreamEvent(event, state, textPreviewEl) {
             if (event.tool === 'run_query') {
                 finaliseReasoningSQLStep(event.row_count, event.error);
             } else if (event.tool === 'create_chart') {
-                finaliseReasoningChartStep(event.chart_type, event.title);
+                finaliseReasoningChartStep();
             }
             break;
 
@@ -518,6 +515,52 @@ function clearReasoningPanel() {
 
 // ===== Reasoning Step Builders =====
 
+// SVG snippets
+const SVG_ARROW  = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>`;
+const SVG_CHECK  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+const SVG_CROSS  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+const SVG_CHART  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 17V10M12 17V7M17 17v-5"/></svg>`;
+const SVG_TEXT   = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="13" y1="18" x2="3" y2="18"/></svg>`;
+
+/**
+ * Create a collapsible step card.
+ * Returns { el, statusEl, bodyEl } for later mutation.
+ */
+function makeStep(iconHtml, iconClass, labelText) {
+    const el = document.createElement('div');
+    el.className = 'rs-step';
+
+    const header = document.createElement('div');
+    header.className = 'rs-step-header';
+    header.innerHTML = `
+        <span class="rs-toggle">${SVG_ARROW}</span>
+        <span class="rs-step-icon ${iconClass}">${iconHtml}</span>
+        <span class="rs-step-label">${escapeHtml(labelText)}</span>
+        <span class="rs-step-status"><span class="rs-spinner"></span></span>
+    `;
+    header.addEventListener('click', () => el.classList.toggle('open'));
+
+    const body = document.createElement('div');
+    body.className = 'rs-step-body';
+
+    el.appendChild(header);
+    el.appendChild(body);
+    reasoningSteps.appendChild(el);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+
+    return {
+        el,
+        statusEl: header.querySelector('.rs-step-status'),
+        bodyEl: body,
+    };
+}
+
+function setStepDone(statusEl, ok, text) {
+    statusEl.className = 'rs-step-status ' + (ok ? 'ok' : 'error');
+    statusEl.innerHTML = (ok ? SVG_CHECK : SVG_CROSS) + ' ' + escapeHtml(text);
+}
+
+// ── Non-collapsible "thinking" line ──────────────────────────────────────────
 function addReasoningThinking(message) {
     const el = document.createElement('div');
     el.className = 'rs-thinking';
@@ -527,124 +570,86 @@ function addReasoningThinking(message) {
     return el;
 }
 
-// SQL step — two-phase: header added now, result row added later
+// ── SQL step (two-phase) ──────────────────────────────────────────────────────
 let _activeSQLStep = null;
 
 function addReasoningSQLStep(sql, explanation) {
-    const el = document.createElement('div');
-    el.className = 'rs-step rs-sql-step';
-    el.innerHTML = `
-        <div class="rs-sql-header">
-            <span class="rs-sql-icon">SQL</span>
-            <span class="rs-sql-label">Running SQL query</span>
-            <span class="rs-spinner"></span>
-        </div>
-        ${explanation ? `<div class="rs-sql-explanation">${escapeHtml(explanation)}</div>` : ''}
-        <pre class="rs-sql-code">${escapeHtml(sql)}</pre>
-    `;
-    reasoningSteps.appendChild(el);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
-    _activeSQLStep = el;
-    return el;
+    const step = makeStep('SQL', 'sql', 'Running SQL query');
+    if (explanation) {
+        const exp = document.createElement('div');
+        exp.className = 'rs-body-explanation';
+        exp.textContent = explanation;
+        step.bodyEl.appendChild(exp);
+    }
+    const code = document.createElement('pre');
+    code.className = 'rs-body-code';
+    code.textContent = sql;
+    step.bodyEl.appendChild(code);
+    _activeSQLStep = step;
+    return step.el;
 }
 
 function finaliseReasoningSQLStep(rowCount, isError) {
-    const el = _activeSQLStep;
-    if (!el) return;
-    // Remove spinner
-    const spinner = el.querySelector('.rs-spinner');
-    if (spinner) spinner.remove();
-    // Add result row
-    const result = document.createElement('div');
-    result.className = 'rs-sql-result ' + (isError ? 'error' : 'ok');
-    result.innerHTML = isError
-        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Query error`
-        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ${rowCount.toLocaleString()} row${rowCount !== 1 ? 's' : ''} returned`;
-    el.appendChild(result);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    if (!_activeSQLStep) return;
+    const label = isError ? 'Query error' : `${rowCount.toLocaleString()} row${rowCount !== 1 ? 's' : ''}`;
+    setStepDone(_activeSQLStep.statusEl, !isError, label);
     _activeSQLStep = null;
 }
 
-// Chart step — two-phase
+// ── Chart step (two-phase) ────────────────────────────────────────────────────
 let _activeChartStep = null;
 
 function addReasoningChartStep(chartType, title) {
-    const el = document.createElement('div');
-    el.className = 'rs-step rs-chart-step';
-    el.innerHTML = `
-        <div class="rs-chart-header">
-            <span class="rs-chart-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 17V10M12 17V7M17 17v-5"/></svg>
-            </span>
-            <span class="rs-chart-label">Creating ${escapeHtml(chartType)} chart</span>
-            <span class="rs-spinner"></span>
-        </div>
-        <div class="rs-chart-detail">${escapeHtml(title)}</div>
-    `;
-    reasoningSteps.appendChild(el);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
-    _activeChartStep = el;
-    return el;
+    const step = makeStep(SVG_CHART, 'chart', `Creating ${chartType} chart`);
+    if (title) {
+        const detail = document.createElement('div');
+        detail.className = 'rs-body-detail';
+        detail.textContent = title;
+        step.bodyEl.appendChild(detail);
+    }
+    _activeChartStep = step;
+    return step.el;
 }
 
-function finaliseReasoningChartStep(chartType, title) {
-    const el = _activeChartStep;
-    if (!el) return;
-    const spinner = el.querySelector('.rs-spinner');
-    if (spinner) spinner.remove();
-    const result = document.createElement('div');
-    result.className = 'rs-chart-result';
-    result.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Chart ready`;
-    el.appendChild(result);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+function finaliseReasoningChartStep() {
+    if (!_activeChartStep) return;
+    setStepDone(_activeChartStep.statusEl, true, 'Chart ready');
     _activeChartStep = null;
 }
 
+// ── Schema step (single-phase, no spinner needed) ─────────────────────────────
 function addReasoningSchemaStep(scope, tableName) {
     const label = scope === 'table_detail' && tableName
-        ? `Schema: ${tableName} table`
+        ? `Schema: ${tableName}`
         : scope === 'relationships' ? 'Schema: relationships'
         : 'Schema: overview';
-    const el = document.createElement('div');
-    el.className = 'rs-step rs-schema-step';
-    el.innerHTML = `
-        <span class="rs-schema-icon">DB</span>
-        <span class="rs-schema-label">${escapeHtml(label)}</span>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" style="margin-left:auto"><polyline points="20 6 9 17 4 12"/></svg>
-    `;
-    reasoningSteps.appendChild(el);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
-    return el;
+    const step = makeStep('DB', 'db', label);
+    // Immediately mark as done
+    setStepDone(step.statusEl, true, 'Loaded');
+    return step.el;
 }
+
+// ── Text / response step ──────────────────────────────────────────────────────
+let _activeTextStep = null;
 
 function addReasoningTextStep() {
-    const el = document.createElement('div');
-    el.className = 'rs-step rs-text-step';
-    el.innerHTML = `
-        <div class="rs-text-header">
-            <span class="rs-text-icon">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="13" y1="18" x2="3" y2="18"/></svg>
-            </span>
-            <span class="rs-text-label">Generating response</span>
-        </div>
-        <div class="rs-text-preview streaming"></div>
-    `;
-    reasoningSteps.appendChild(el);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
-    // Return the preview div so caller can stream text into it
-    return el.querySelector('.rs-text-preview');
+    const step = makeStep(SVG_TEXT, 'text', 'Generating response');
+    const preview = document.createElement('div');
+    preview.className = 'rs-body-text';
+    step.bodyEl.appendChild(preview);
+    // Auto-open so streaming text is visible while it runs
+    step.el.classList.add('open');
+    _activeTextStep = step;
+    return preview;   // caller streams text into this element
 }
 
-function appendReasoningResult(stepEl, ok, message) {
-    if (!stepEl) return;
-    const header = stepEl.querySelector('.rs-text-header');
-    if (!header) return;
-    const result = document.createElement('div');
-    result.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:0.74rem;border-top:1px solid var(--border);background:var(--bg-secondary);color:#22c55e;';
-    result.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ${escapeHtml(message)}`;
-    stepEl.appendChild(result);
-    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+function finaliseReasoningTextStep() {
+    if (!_activeTextStep) return;
+    setStepDone(_activeTextStep.statusEl, true, 'Complete');
+    _activeTextStep = null;
 }
+
+function appendReasoningResult() {} // kept for call-site compat, no-op
 
 function addMessage(role, text) {
     const div = document.createElement('div');
