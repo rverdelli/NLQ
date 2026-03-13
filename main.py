@@ -1,11 +1,12 @@
 """FastAPI application for the E-Commerce Data Chatbot."""
 
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from models import ChatRequest, ChatResponse, QueryInfo, SchemaResponse
 from database import get_schema_info
-from claude_service import chat
+from claude_service import chat, chat_stream
 
 app = FastAPI(title="DataChat — E-Commerce Analytics Assistant")
 
@@ -37,6 +38,26 @@ def get_suggestions():
             "Show me customer registrations over time",
         ]
     }
+
+
+@app.post("/api/chat/stream")
+def chat_stream_endpoint(req: ChatRequest):
+    def generate():
+        try:
+            for event in chat_stream(req.message, req.history):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.post("/api/chat")

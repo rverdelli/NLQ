@@ -15,6 +15,11 @@ const schemaModalOverlay = document.getElementById('schemaModalOverlay');
 const schemaModalClose = document.getElementById('schemaModalClose');
 const erdTables = document.getElementById('erdTables');
 const erdLines = document.getElementById('erdLines');
+const reasoningToggleBtn = document.getElementById('reasoningToggleBtn');
+const reasoningPanel = document.getElementById('reasoningPanel');
+const reasoningPanelClose = document.getElementById('reasoningPanelClose');
+const reasoningSteps = document.getElementById('reasoningSteps');
+const reasoningEmpty = document.getElementById('reasoningEmpty');
 const sidebarToggle = document.getElementById('sidebarToggle');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
 const themeToggle = document.getElementById('themeToggle');
@@ -95,6 +100,10 @@ function setupEventListeners() {
             if (q) askQuestion(q);
         });
     });
+
+    // Reasoning panel
+    reasoningToggleBtn.addEventListener('click', toggleReasoningPanel);
+    reasoningPanelClose.addEventListener('click', closeReasoningPanel);
 
     // Schema modal
     schemaModalBtn.addEventListener('click', openSchemaModal);
@@ -331,7 +340,7 @@ async function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || isLoading) return;
 
-    // Hide welcome
+    // Hide welcome card
     if (welcomeCard) welcomeCard.style.display = 'none';
 
     // Close mobile sidebar
@@ -346,42 +355,295 @@ async function sendMessage() {
     messageInput.value = '';
     messageInput.style.height = 'auto';
 
+    // Open and clear reasoning panel
+    openReasoningPanel();
+    clearReasoningPanel();
+
     // Show loading
     isLoading = true;
     sendBtn.disabled = true;
     const loadingEl = addLoading();
 
+    // Stream state
+    const state = { chart: null, queryInfo: null, reply: '', suggestions: [], error: null };
+    // Pointer to the live text step DOM node for streaming updates
+    let textPreviewEl = null;
+
     try {
-        const res = await fetch('/api/chat', {
+        const res = await fetch('/api/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: text,
-                history: chatHistory.slice(-20), // last 20 messages for context
+                history: chatHistory.slice(-20),
             }),
         });
 
-        if (!res.ok) {
-            throw new Error(`Server error: ${res.status}`);
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+        // Parse the SSE stream line by line
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop(); // keep incomplete tail
+
+            for (const part of parts) {
+                const line = part.trim();
+                if (!line.startsWith('data: ')) continue;
+                let event;
+                try { event = JSON.parse(line.slice(6)); } catch { continue; }
+                textPreviewEl = handleStreamEvent(event, state, textPreviewEl);
+            }
         }
 
-        const data = await res.json();
-
-        // Remove loading
-        loadingEl.remove();
-
-        // Add bot message
-        addBotMessage(data);
-        chatHistory.push({ role: 'assistant', content: data.reply });
+        // Stream ended — mark text step complete
+        if (textPreviewEl) {
+            textPreviewEl.classList.remove('streaming');
+            appendReasoningResult(textPreviewEl.parentElement, true, 'Response complete');
+        }
 
     } catch (e) {
-        loadingEl.remove();
-        addMessage('bot', `Sorry, something went wrong: ${e.message}. Please try again.`);
-    } finally {
-        isLoading = false;
-        sendBtn.disabled = false;
-        messageInput.focus();
+        state.error = e.message;
+        addReasoningThinking(`Error: ${e.message}`);
     }
+
+    loadingEl.remove();
+
+    if (state.error && !state.reply) {
+        addMessage('bot', `Sorry, something went wrong: ${state.error}. Please try again.`);
+    } else if (state.reply) {
+        addBotMessage({ reply: state.reply, chart: state.chart, query_info: state.queryInfo, suggestions: state.suggestions });
+        chatHistory.push({ role: 'assistant', content: state.reply });
+    }
+
+    isLoading = false;
+    sendBtn.disabled = false;
+    messageInput.focus();
+}
+
+// ===== Stream Event Handler =====
+function handleStreamEvent(event, state, textPreviewEl) {
+    switch (event.type) {
+
+        case 'reasoning':
+            addReasoningThinking(event.message);
+            break;
+
+        case 'tool_call':
+            if (event.tool === 'run_query') {
+                addReasoningSQLStep(event.sql, event.explanation);
+            } else if (event.tool === 'create_chart') {
+                addReasoningChartStep(event.chart_type, event.title);
+            } else if (event.tool === 'explain_schema') {
+                addReasoningSchemaStep(event.scope, event.table_name);
+            }
+            break;
+
+        case 'tool_result':
+            if (event.tool === 'run_query') {
+                finaliseReasoningSQLStep(event.row_count, event.error);
+            } else if (event.tool === 'create_chart') {
+                finaliseReasoningChartStep(event.chart_type, event.title);
+            }
+            break;
+
+        case 'text_start':
+            textPreviewEl = addReasoningTextStep();
+            break;
+
+        case 'text_delta':
+            state.reply += event.text;
+            if (textPreviewEl) {
+                textPreviewEl.textContent = state.reply;
+                textPreviewEl.scrollTop = textPreviewEl.scrollHeight;
+            }
+            break;
+
+        case 'chart':
+            state.chart = event.data;
+            break;
+
+        case 'query_info':
+            state.queryInfo = event.data;
+            break;
+
+        case 'done':
+            state.reply = event.reply || state.reply;
+            state.chart = event.chart || state.chart;
+            state.queryInfo = event.query_info || state.queryInfo;
+            state.suggestions = event.suggestions || [];
+            break;
+
+        case 'error':
+            state.error = event.message;
+            addReasoningThinking(`⚠ ${event.message}`);
+            break;
+    }
+    return textPreviewEl;
+}
+
+// ===== Reasoning Panel Controls =====
+function openReasoningPanel() {
+    reasoningPanel.classList.add('open');
+    reasoningToggleBtn.classList.add('active');
+}
+
+function closeReasoningPanel() {
+    reasoningPanel.classList.remove('open');
+    reasoningToggleBtn.classList.remove('active');
+}
+
+function toggleReasoningPanel() {
+    if (reasoningPanel.classList.contains('open')) {
+        closeReasoningPanel();
+    } else {
+        openReasoningPanel();
+    }
+}
+
+function clearReasoningPanel() {
+    // Remove everything except the empty-state placeholder
+    Array.from(reasoningSteps.children).forEach(child => {
+        if (child !== reasoningEmpty) child.remove();
+    });
+    reasoningEmpty.style.display = 'none';
+}
+
+// ===== Reasoning Step Builders =====
+
+function addReasoningThinking(message) {
+    const el = document.createElement('div');
+    el.className = 'rs-thinking';
+    el.innerHTML = `<span class="rs-thinking-dot pulsing"></span><span>${escapeHtml(message)}</span>`;
+    reasoningSteps.appendChild(el);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    return el;
+}
+
+// SQL step — two-phase: header added now, result row added later
+let _activeSQLStep = null;
+
+function addReasoningSQLStep(sql, explanation) {
+    const el = document.createElement('div');
+    el.className = 'rs-step rs-sql-step';
+    el.innerHTML = `
+        <div class="rs-sql-header">
+            <span class="rs-sql-icon">SQL</span>
+            <span class="rs-sql-label">Running SQL query</span>
+            <span class="rs-spinner"></span>
+        </div>
+        ${explanation ? `<div class="rs-sql-explanation">${escapeHtml(explanation)}</div>` : ''}
+        <pre class="rs-sql-code">${escapeHtml(sql)}</pre>
+    `;
+    reasoningSteps.appendChild(el);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    _activeSQLStep = el;
+    return el;
+}
+
+function finaliseReasoningSQLStep(rowCount, isError) {
+    const el = _activeSQLStep;
+    if (!el) return;
+    // Remove spinner
+    const spinner = el.querySelector('.rs-spinner');
+    if (spinner) spinner.remove();
+    // Add result row
+    const result = document.createElement('div');
+    result.className = 'rs-sql-result ' + (isError ? 'error' : 'ok');
+    result.innerHTML = isError
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Query error`
+        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ${rowCount.toLocaleString()} row${rowCount !== 1 ? 's' : ''} returned`;
+    el.appendChild(result);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    _activeSQLStep = null;
+}
+
+// Chart step — two-phase
+let _activeChartStep = null;
+
+function addReasoningChartStep(chartType, title) {
+    const el = document.createElement('div');
+    el.className = 'rs-step rs-chart-step';
+    el.innerHTML = `
+        <div class="rs-chart-header">
+            <span class="rs-chart-icon">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 17V10M12 17V7M17 17v-5"/></svg>
+            </span>
+            <span class="rs-chart-label">Creating ${escapeHtml(chartType)} chart</span>
+            <span class="rs-spinner"></span>
+        </div>
+        <div class="rs-chart-detail">${escapeHtml(title)}</div>
+    `;
+    reasoningSteps.appendChild(el);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    _activeChartStep = el;
+    return el;
+}
+
+function finaliseReasoningChartStep(chartType, title) {
+    const el = _activeChartStep;
+    if (!el) return;
+    const spinner = el.querySelector('.rs-spinner');
+    if (spinner) spinner.remove();
+    const result = document.createElement('div');
+    result.className = 'rs-chart-result';
+    result.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Chart ready`;
+    el.appendChild(result);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    _activeChartStep = null;
+}
+
+function addReasoningSchemaStep(scope, tableName) {
+    const label = scope === 'table_detail' && tableName
+        ? `Schema: ${tableName} table`
+        : scope === 'relationships' ? 'Schema: relationships'
+        : 'Schema: overview';
+    const el = document.createElement('div');
+    el.className = 'rs-step rs-schema-step';
+    el.innerHTML = `
+        <span class="rs-schema-icon">DB</span>
+        <span class="rs-schema-label">${escapeHtml(label)}</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" style="margin-left:auto"><polyline points="20 6 9 17 4 12"/></svg>
+    `;
+    reasoningSteps.appendChild(el);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    return el;
+}
+
+function addReasoningTextStep() {
+    const el = document.createElement('div');
+    el.className = 'rs-step rs-text-step';
+    el.innerHTML = `
+        <div class="rs-text-header">
+            <span class="rs-text-icon">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="13" y1="18" x2="3" y2="18"/></svg>
+            </span>
+            <span class="rs-text-label">Generating response</span>
+        </div>
+        <div class="rs-text-preview streaming"></div>
+    `;
+    reasoningSteps.appendChild(el);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
+    // Return the preview div so caller can stream text into it
+    return el.querySelector('.rs-text-preview');
+}
+
+function appendReasoningResult(stepEl, ok, message) {
+    if (!stepEl) return;
+    const header = stepEl.querySelector('.rs-text-header');
+    if (!header) return;
+    const result = document.createElement('div');
+    result.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:0.74rem;border-top:1px solid var(--border);background:var(--bg-secondary);color:#22c55e;';
+    result.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ${escapeHtml(message)}`;
+    stepEl.appendChild(result);
+    reasoningSteps.scrollTop = reasoningSteps.scrollHeight;
 }
 
 function addMessage(role, text) {

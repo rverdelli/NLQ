@@ -319,10 +319,151 @@ def chat(user_message: str, history: list[dict]) -> dict:
 
 def _extract_suggestions(reply: str) -> list[str]:
     """Generate contextual follow-up suggestions based on the reply content."""
-    # Default suggestions if we can't extract specific ones
     defaults = [
         "Show me revenue by category",
         "What are the top 10 customers by spending?",
         "How did sales trend month over month?",
     ]
     return defaults
+
+
+# ---------------------------------------------------------------------------
+# Streaming variant
+# ---------------------------------------------------------------------------
+
+def chat_stream(user_message: str, history: list[dict]):
+    """
+    Generator that yields SSE-ready dicts as Claude processes a message.
+    Emits reasoning steps (tool calls, results) and text deltas in real-time.
+    """
+    messages = []
+    for h in history:
+        messages.append({"role": h["role"], "content": h["content"]})
+    messages.append({"role": "user", "content": user_message})
+
+    chart_config = None
+    query_info = None
+    full_reply = ""
+
+    yield {"type": "reasoning", "message": "Analyzing your question…"}
+
+    for _iteration in range(10):
+        # ── One streaming API call ────────────────────────────────────────
+        with client.messages.stream(
+            model=CLAUDE_MODEL,
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            tools=TOOLS,
+            messages=messages,
+        ) as stream:
+            in_text_block = False
+            text_started = False
+
+            for event in stream:
+                if event.type == "content_block_start":
+                    cb = event.content_block
+                    if cb.type == "text":
+                        in_text_block = True
+                        if not text_started:
+                            text_started = True
+                            yield {"type": "text_start"}
+                    else:
+                        in_text_block = False
+
+                elif event.type == "content_block_delta":
+                    delta = event.delta
+                    if delta.type == "text_delta" and in_text_block:
+                        full_reply += delta.text
+                        yield {"type": "text_delta", "text": delta.text}
+
+            final_message = stream.get_final_message()
+
+        # ── Inspect the completed message ─────────────────────────────────
+        tool_use_blocks = [b for b in final_message.content if b.type == "tool_use"]
+
+        if not tool_use_blocks:
+            # Final answer — text already streamed via text_delta
+            if not full_reply:
+                full_reply = " ".join(
+                    b.text for b in final_message.content if b.type == "text"
+                )
+            yield {
+                "type": "done",
+                "reply": full_reply,
+                "chart": chart_config,
+                "query_info": query_info,
+                "suggestions": _extract_suggestions(full_reply),
+            }
+            return
+
+        # ── Process tool calls ────────────────────────────────────────────
+        messages.append({"role": "assistant", "content": final_message.content})
+        tool_results = []
+
+        for tool_block in tool_use_blocks:
+            # Emit "about to call" event
+            if tool_block.name == "run_query":
+                yield {
+                    "type": "tool_call",
+                    "tool": "run_query",
+                    "sql": tool_block.input.get("sql", ""),
+                    "explanation": tool_block.input.get("explanation", ""),
+                }
+            elif tool_block.name == "create_chart":
+                yield {
+                    "type": "tool_call",
+                    "tool": "create_chart",
+                    "chart_type": tool_block.input.get("chart_type", ""),
+                    "title": tool_block.input.get("title", ""),
+                }
+            elif tool_block.name == "explain_schema":
+                yield {
+                    "type": "tool_call",
+                    "tool": "explain_schema",
+                    "scope": tool_block.input.get("scope", "overview"),
+                    "table_name": tool_block.input.get("table_name", ""),
+                }
+
+            # Execute the tool
+            result_text, tc, qi = _handle_tool_call(tool_block.name, tool_block.input)
+
+            if tc:
+                chart_config = tc
+            if qi:
+                query_info = qi
+
+            # Emit result event
+            if tool_block.name == "run_query":
+                is_error = qi is None or ("error" in result_text.lower() and (qi or {}).get("row_count", -1) == 0)
+                yield {
+                    "type": "tool_result",
+                    "tool": "run_query",
+                    "row_count": qi.get("row_count", 0) if qi else 0,
+                    "error": is_error,
+                }
+            elif tool_block.name == "create_chart":
+                yield {
+                    "type": "tool_result",
+                    "tool": "create_chart",
+                    "chart_type": tool_block.input.get("chart_type", ""),
+                    "title": tool_block.input.get("title", ""),
+                }
+            else:
+                yield {"type": "tool_result", "tool": tool_block.name, "message": "Done"}
+
+            # Pass chart/query_info along so the frontend can store them
+            if tc:
+                yield {"type": "chart", "data": tc}
+            if qi:
+                yield {"type": "query_info", "data": qi}
+
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tool_block.id,
+                "content": result_text,
+            })
+
+        messages.append({"role": "user", "content": tool_results})
+        yield {"type": "reasoning", "message": "Processing results, preparing answer…"}
+
+    yield {"type": "error", "message": "Reached maximum processing steps."}

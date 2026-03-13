@@ -945,6 +945,411 @@ html, body {
     .sidebar-overlay { display: none !important; }
 }
 
+/* ===== Reasoning Toggle Button ===== */
+.reasoning-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.reasoning-toggle-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
+.reasoning-toggle-btn.active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}
+
+.reasoning-btn-label { display: none; }
+@media (min-width: 640px) { .reasoning-btn-label { display: inline; } }
+
+/* ===== Reasoning Panel ===== */
+--reasoning-panel-width: 320px;
+
+.reasoning-panel {
+    width: 320px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateX(100%);
+    width: 0;
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+.reasoning-panel.open {
+    width: 320px;
+    transform: translateX(0);
+}
+
+.reasoning-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.reasoning-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.reasoning-panel-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    display: flex;
+    transition: background 0.15s, color 0.15s;
+}
+
+.reasoning-panel-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.reasoning-steps {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Empty state */
+.reasoning-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 40px 16px;
+}
+
+.reasoning-empty svg { opacity: 0.4; }
+
+.reasoning-empty p {
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+/* ===== Reasoning Steps ===== */
+.rs-step {
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+/* Generic "thinking" step */
+.rs-thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.rs-thinking-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+}
+
+/* animated dot while in-progress */
+.rs-thinking-dot.pulsing {
+    animation: rs-pulse 1.5s infinite;
+}
+
+@keyframes rs-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* SQL query step */
+.rs-sql-step {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.rs-sql-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+}
+
+.rs-sql-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    color: white;
+    font-weight: 700;
+}
+
+.rs-sql-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.rs-sql-explanation {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 5px 10px 4px;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.rs-sql-code {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    padding: 6px 10px 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    max-height: 140px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+}
+
+.rs-sql-result {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 0.74rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.rs-sql-result.ok { color: #22c55e; }
+.rs-sql-result.error { color: #ef4444; }
+
+/* Chart step */
+.rs-chart-step {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.rs-chart-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+}
+
+.rs-chart-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #a855f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+}
+
+.rs-chart-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.rs-chart-detail {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.rs-chart-result {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 0.74rem;
+    color: #22c55e;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+/* Schema step */
+.rs-schema-step {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+}
+
+.rs-schema-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #f59e0b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.rs-schema-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+/* Response text step */
+.rs-text-step {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.rs-text-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+}
+
+.rs-text-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #14b8a6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+}
+
+.rs-text-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.rs-text-preview {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    padding: 6px 10px 8px;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Cursor blink on streaming text */
+.rs-text-preview.streaming::after {
+    content: '▋';
+    animation: blink 0.7s steps(1) infinite;
+    color: var(--accent);
+    font-size: 0.8rem;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Status icons shared */
+.rs-status-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rs-status-ok::before {
+    content: '✓';
+    font-weight: 700;
+}
+
+/* Spinning indicator */
+.rs-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== Responsive reasoning panel ===== */
+@media (max-width: 900px) {
+    .reasoning-panel.open {
+        position: fixed;
+        top: var(--header-height);
+        right: 0;
+        bottom: 0;
+        width: 300px !important;
+        z-index: 20;
+        box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+    }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
