@@ -978,19 +978,15 @@ html, body {
 @media (min-width: 640px) { .reasoning-btn-label { display: inline; } }
 
 /* ===== Reasoning Panel ===== */
---reasoning-panel-width: 320px;
-
 .reasoning-panel {
-    width: 320px;
     flex-shrink: 0;
     background: var(--bg-secondary);
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transform: translateX(100%);
     width: 0;
-    transition: width 0.3s ease, transform 0.3s ease;
+    transition: width 0.3s ease;
 }
 
 .reasoning-panel.open {
@@ -1036,7 +1032,8 @@ html, body {
 
 .reasoning-steps {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
+    min-height: 0;
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -1297,13 +1294,6 @@ html, body {
     word-break: break-word;
 }
 
-/* Cursor blink on streaming text */
-.rs-text-preview.streaming::after {
-    content: '▋';
-    animation: blink 0.7s steps(1) infinite;
-    color: var(--accent);
-    font-size: 0.8rem;
-}
 
 @keyframes blink {
     0%, 100% { opacity: 1; }
