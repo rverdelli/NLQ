@@ -12,6 +12,10 @@ def _cycle_colors(n: int) -> list:
     """Return a list of n colors, cycling through the palette."""
     return [COLORS[i % len(COLORS)] for i in range(n)]
 
+
+# Max items to display in ranking charts (bar/hbar) before truncating
+MAX_BARS = 15
+
 # Keywords that indicate a series name is a metric (not a category label)
 METRIC_KEYWORDS = {
     "revenue", "sales", "count", "total", "profit", "margin", "orders",
@@ -183,9 +187,13 @@ def build_plotly_config(tool_input: dict) -> dict:
         for i, (name, series) in enumerate(series_items):
             y_vals = series.get("x", series.get("y", []))
             x_vals = series.get("y", series.get("x", []))
-            # Sort ascending so the biggest bar is at the top
+            # Sort descending, then keep top N, then reverse so biggest is on top
             if not multi_series:
-                y_vals, x_vals = _sort_by_value(y_vals, x_vals, descending=False)
+                y_vals, x_vals = _sort_by_value(y_vals, x_vals, descending=True)
+                y_vals = y_vals[:MAX_BARS]
+                x_vals = x_vals[:MAX_BARS]
+                y_vals = list(reversed(y_vals))
+                x_vals = list(reversed(x_vals))
                 y_tick_labels = y_vals
             marker = (
                 {"color": COLORS[i % len(COLORS)], "opacity": 0.9}
@@ -222,6 +230,8 @@ def build_plotly_config(tool_input: dict) -> dict:
             y_vals = series.get("y", [])
             if not multi_series:
                 x_vals, y_vals = _sort_by_value(x_vals, y_vals, descending=True)
+                x_vals = x_vals[:MAX_BARS]
+                y_vals = y_vals[:MAX_BARS]
             marker = (
                 {"color": COLORS[i % len(COLORS)], "opacity": 0.9}
                 if multi_series
@@ -243,6 +253,13 @@ def build_plotly_config(tool_input: dict) -> dict:
     else:
         left_margin = 60
 
+    # Dynamic height for hbar so every bar label fits
+    if chart_type == "hbar":
+        n_bars = len(y_tick_labels) if y_tick_labels else 0
+        chart_height = max(400, 36 * n_bars + 120)
+    else:
+        chart_height = 400
+
     layout = {
         "title": {"text": title, "font": {"size": 16}},
         "paper_bgcolor": "rgba(0,0,0,0)",
@@ -253,6 +270,7 @@ def build_plotly_config(tool_input: dict) -> dict:
         "legend": {"orientation": "h", "y": -0.2},
         "bargap": 0.2,
         "bargroupgap": 0.06,
+        "height": chart_height,
     }
 
     if chart_type not in ("pie", "funnel"):
@@ -281,5 +299,9 @@ def build_plotly_config(tool_input: dict) -> dict:
             "linecolor": "rgba(148,163,184,0.2)",
             "automargin": True,
         }
+        # Force every y-tick label to appear in horizontal bar charts
+        if chart_type == "hbar":
+            layout["yaxis"]["tickmode"] = "linear"
+            layout["yaxis"]["dtick"] = 1
 
     return {"data": traces, "layout": layout}

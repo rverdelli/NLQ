@@ -698,7 +698,8 @@ function addBotMessage(data) {
                     if (layout.yaxis) layout.yaxis.gridcolor = 'rgba(148,163,184,0.2)';
                 }
                 layout.autosize = true;
-                layout.height = 400;
+                // Respect backend-set height (e.g. dynamic hbar); default to 400
+                if (!layout.height) layout.height = 400;
 
                 Plotly.newPlot(chartId, data.chart.data, layout, {
                     responsive: true,
