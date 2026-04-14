@@ -7,6 +7,11 @@ COLORS = [
     "#06b6d4", "#3b82f6",
 ]
 
+
+def _cycle_colors(n: int) -> list:
+    """Return a list of n colors, cycling through the palette."""
+    return [COLORS[i % len(COLORS)] for i in range(n)]
+
 # Keywords that indicate a series name is a metric (not a category label)
 METRIC_KEYWORDS = {
     "revenue", "sales", "count", "total", "profit", "margin", "orders",
@@ -121,7 +126,7 @@ def build_plotly_config(tool_input: dict) -> dict:
             "labels": labels or [],
             "values": values or [],
             "hole": 0.4,
-            "marker": {"colors": COLORS[:len(labels or [])]},
+            "marker": {"colors": _cycle_colors(len(labels or []))},
             "textinfo": "percent+label",
             "hoverinfo": "label+value+percent",
         })
@@ -185,7 +190,7 @@ def build_plotly_config(tool_input: dict) -> dict:
             marker = (
                 {"color": COLORS[i % len(COLORS)], "opacity": 0.9}
                 if multi_series
-                else {"color": list(reversed(COLORS[:len(y_vals)])), "opacity": 0.9}
+                else {"color": list(reversed(_cycle_colors(len(y_vals)))), "opacity": 0.9}
             )
             traces.append({
                 "type": "bar",
@@ -220,7 +225,7 @@ def build_plotly_config(tool_input: dict) -> dict:
             marker = (
                 {"color": COLORS[i % len(COLORS)], "opacity": 0.9}
                 if multi_series
-                else {"color": COLORS[:len(x_vals)], "opacity": 0.9}
+                else {"color": _cycle_colors(len(x_vals)), "opacity": 0.9}
             )
             traces.append({
                 "type": "bar",
