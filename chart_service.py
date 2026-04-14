@@ -8,6 +8,29 @@ COLORS = [
 ]
 
 
+def _flatten_per_category_series(data: dict) -> dict:
+    """
+    Safety net: if the LLM sent one series per category (each series has a single
+    x/y point), flatten into a single series. This fixes unreadable charts.
+    """
+    if not isinstance(data, dict) or len(data) < 2:
+        return data
+    series_items = [(n, s) for n, s in data.items() if isinstance(s, dict)]
+    if len(series_items) < 2:
+        return data
+    # Detect: every series has x and y of length 1
+    all_single_point = all(
+        len(s.get("x", [])) == 1 and len(s.get("y", [])) == 1
+        for _, s in series_items
+    )
+    if not all_single_point:
+        return data
+    # Flatten: use series names as x, values as y
+    xs = [s.get("x", [n])[0] for n, s in series_items]
+    ys = [s.get("y", [0])[0] for _, s in series_items]
+    return {"Value": {"x": xs, "y": ys}}
+
+
 def build_plotly_config(tool_input: dict) -> dict:
     """
     Convert a create_chart tool call into a Plotly JSON config
@@ -18,6 +41,10 @@ def build_plotly_config(tool_input: dict) -> dict:
     x_label = tool_input.get("x_label", "")
     y_label = tool_input.get("y_label", "")
     data = tool_input.get("data", {})
+
+    # Safety net for bar/hbar/line/area when LLM malformed the series
+    if chart_type in ("bar", "hbar", "line", "area"):
+        data = _flatten_per_category_series(data)
 
     traces = []
     color_idx = 0

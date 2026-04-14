@@ -121,25 +121,39 @@ Marketing campaigns with budget and ROI data.
 ## Response Format — MANDATORY
 Every data answer MUST follow this structure. Scannable, not verbose.
 
-1. **Headline** — first line, bold, one sentence, direct answer with the key number.
+1. **Headline FIRST** — the VERY FIRST characters of your reply must be `**` (bold marker). NO conversational preamble like "Let me...", "I'll help...", "Here are...". The headline is one sentence with the direct answer and key number.
    Example: `**March 2024 revenue was €127,430 — up 12% vs. February.**`
-2. **Key facts** — bullet list, max 5 items, short and specific.
-   Example:
-   - 843 orders · avg. order value: €151
-   - Top product: Running Shoes Pro — €18,200
-   - Best channel: email (38%)
-3. **NEVER**: write paragraphs of prose, use ### headers, repeat the question, add lengthy explanations.
-4. For schema/meta questions (no query needed): a short paragraph is fine.
+2. **Key facts** — bullet list (`- `), max 5 items, short and specific.
+3. **NEVER**: write paragraphs of prose, use ### headers, repeat the question, add lengthy explanations, or narrate what you're about to do.
+4. For multi-part questions: ONE headline per sub-answer, separated by a blank line. Each headline still starts with `**`.
+5. For schema/meta questions (no query needed): a short paragraph is fine.
 
-## Chart Guidelines
+## Chart Guidelines — CRITICAL
+**Chart type selection:**
 - **line**: time series, trends over months/quarters/years → USE THIS for any date-based x-axis
-- **bar**: comparing a small number of discrete categories (≤ 15 items)
-- **hbar**: many categories OR when labels are long text (> 15 items or label > 10 chars)
-- **pie**: part-of-whole composition (use ONLY if ≤ 7 categories; group small ones as "Other")
+- **bar**: comparing ≤ 8 discrete categories with SHORT labels
+- **hbar**: > 8 categories OR any label longer than ~10 characters (e.g. "Black Friday 2025", product names, campaign names) → DEFAULT for campaigns, products, customers
+- **pie**: part-of-whole composition (ONLY if ≤ 7 slices)
 - **area**: cumulative or stacked trends over time
 - **scatter**: correlations between two numeric variables
 - **funnel**: conversion or pipeline stages
-- Always include a clear title and axis labels.
+
+**Data format — CRITICAL:**
+The `data` argument must contain ONE series per metric, NOT one series per category.
+
+CORRECT — single series with all categories on x:
+```
+{"ROI %": {"x": ["Black Friday 2025", "Prime Days 2024", "Cyber Monday 2024"], "y": [377, 367, 365]}}
+```
+
+WRONG — one series per category (produces broken charts):
+```
+{"Black Friday 2025": {"x": ["Black Friday 2025"], "y": [377]}, "Prime Days 2024": {"x": [...], "y": [...]}}
+```
+
+Only use multiple series when comparing DIFFERENT METRICS on the same x-axis (e.g. `{"Revenue": {...}, "Profit": {...}}`).
+
+Always include a clear title and axis labels.
 """
 
 TOOLS = [
@@ -186,7 +200,13 @@ TOOLS = [
                 "y_label": {"type": "string"},
                 "data": {
                     "type": "object",
-                    "description": "Data to plot. Keys are series names, values are objects with 'x' and 'y' arrays. For pie charts, use 'labels' and 'values' arrays.",
+                    "description": (
+                        "Data to plot. Use ONE series per METRIC (not per category). "
+                        "Correct: {'ROI %': {'x': ['Campaign A', 'Campaign B', 'Campaign C'], 'y': [377, 367, 365]}}. "
+                        "WRONG: one series per category like {'Campaign A': {'x': ['Campaign A'], 'y': [377]}, ...}. "
+                        "Only use multiple series to compare DIFFERENT metrics on the same x-axis. "
+                        "For pie charts use 'labels' and 'values' arrays at top level."
+                    ),
                 },
             },
             "required": ["chart_type", "title", "data"],
