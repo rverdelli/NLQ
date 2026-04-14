@@ -3,3 +3,5 @@ __pycache__/
 .env
 ecommerce.db-shm
 ecommerce.db-wal
+.venv/
+_probe.py
