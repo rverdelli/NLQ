@@ -1,4 +1,6 @@
 """Plotly chart configuration builder."""
+import sys
+import json
 
 # Color palette
 COLORS = [
@@ -85,6 +87,17 @@ def _normalize_series_data(data: dict) -> dict:
             ys.append(max(nz) if nz else (y_vals[0] if y_vals else 0))
         return {"Value": {"x": xs, "y": ys}}
 
+    # Pattern D (final safety net): too many series (>= 5) — legitimate
+    # multi-metric comparisons rarely have > 4 series.
+    if len(series_items) >= 5:
+        xs = series_names
+        ys = []
+        for _, s in series_items:
+            y_vals = s.get("y", [])
+            nz = _nonzero_values(y_vals)
+            ys.append(max(nz) if nz else (y_vals[0] if y_vals else 0))
+        return {"Value": {"x": xs, "y": ys}}
+
     return data
 
 
@@ -116,9 +129,20 @@ def build_plotly_config(tool_input: dict) -> dict:
     y_label = tool_input.get("y_label", "")
     data = tool_input.get("data", {})
 
+    # Debug: log what the LLM sent so we can diagnose malformed charts
+    try:
+        preview = {k: {kk: (vv[:3] if isinstance(vv, list) else vv) for kk, vv in v.items()}
+                   if isinstance(v, dict) else v for k, v in list(data.items())[:5]}
+        print(f"[chart] type={chart_type} series_count={len(data)} sample={json.dumps(preview, default=str)[:400]}", file=sys.stderr)
+    except Exception:
+        pass
+
     # Safety net: fix malformed multi-series data
     if chart_type in ("bar", "hbar", "line", "area"):
+        before_keys = list(data.keys())[:5]
         data = _normalize_series_data(data)
+        if list(data.keys()) != before_keys:
+            print(f"[chart] normalized → keys={list(data.keys())}", file=sys.stderr)
 
     # Auto-upgrade bar → hbar if labels are long
     if chart_type == "bar":
@@ -201,8 +225,24 @@ def build_plotly_config(tool_input: dict) -> dict:
         series_items = [(n, s) for n, s in data.items() if isinstance(s, dict)]
         multi_series = len(series_items) > 1
         for i, (name, series) in enumerate(series_items):
-            y_vals = series.get("x", series.get("y", []))
-            x_vals = series.get("y", series.get("x", []))
+            raw_x = series.get("x", [])
+            raw_y = series.get("y", [])
+            # For hbar: labels go on y, values go on x.
+            # Detect which is which by type — strings = labels, numbers = values
+            x_is_num = raw_x and isinstance(raw_x[0], (int, float))
+            y_is_num = raw_y and isinstance(raw_y[0], (int, float))
+            if y_is_num and not x_is_num:
+                # Standard: x=labels, y=values → swap for hbar
+                y_vals = raw_x
+                x_vals = raw_y
+            elif x_is_num and not y_is_num:
+                # Already hbar-shaped: x=values, y=labels
+                y_vals = raw_y
+                x_vals = raw_x
+            else:
+                # Fallback: assume x=labels, y=values
+                y_vals = raw_x
+                x_vals = raw_y
             # Sort descending, then keep top N, then reverse so biggest is on top
             if not multi_series:
                 y_vals, x_vals = _sort_by_value(y_vals, x_vals, descending=True)
