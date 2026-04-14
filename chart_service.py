@@ -33,13 +33,13 @@ def _looks_like_metric_name(name: str) -> bool:
 def _normalize_series_data(data: dict) -> dict:
     """
     Detect and fix malformed multi-series data where the LLM sent one
-    series per category. Returns a single flat series when the pattern
-    is detected, otherwise the data unchanged.
+    series per category. Returns a single flat series when any of these
+    patterns is detected:
 
-    Patterns fixed:
-    A) Every series has x and y of length 1 (one point per series).
-    B) Series names don't look like metric names (e.g. "Italy", "Germany")
-       — we collapse by taking each series's max y value.
+    A) Every series has y of length 1 (one point per series).
+    B) Every series has AT MOST one non-zero y value (one bar per series
+       spread across a shared x array — very common LLM mistake).
+    C) No series name looks like a metric keyword (all category labels).
     """
     if not isinstance(data, dict) or len(data) < 2:
         return data
@@ -47,26 +47,42 @@ def _normalize_series_data(data: dict) -> dict:
     if len(series_items) < 2:
         return data
 
+    def _nonzero_values(y_vals):
+        return [v for v in y_vals if v]
+
     # Pattern A: every series is a single point
     if all(
-        len(s.get("x", [])) == 1 and len(s.get("y", [])) == 1
+        len(s.get("y", [])) == 1
         for _, s in series_items
     ):
-        xs = [s.get("x", [n])[0] for n, s in series_items]
-        ys = [s.get("y", [0])[0] for _, s in series_items]
+        xs = []
+        ys = []
+        for n, s in series_items:
+            x_val = s.get("x", [])
+            xs.append(x_val[0] if x_val else n)
+            y_val = s.get("y", [0])
+            ys.append(y_val[0] if y_val else 0)
         return {"Value": {"x": xs, "y": ys}}
 
-    # Pattern B: series names are category labels, not metric names
+    # Pattern B: every series has at most one non-zero y value
+    nonzero_counts = [len(_nonzero_values(s.get("y", []))) for _, s in series_items]
+    if all(c <= 1 for c in nonzero_counts):
+        xs = [n for n, _ in series_items]
+        ys = []
+        for _, s in series_items:
+            nz = _nonzero_values(s.get("y", []))
+            ys.append(max(nz) if nz else 0)
+        return {"Value": {"x": xs, "y": ys}}
+
+    # Pattern C: no series name looks like a metric (all category labels)
     series_names = [n for n, _ in series_items]
     if not any(_looks_like_metric_name(n) for n in series_names):
-        # Treat each series name as a category, take its highest y as the value
         xs = series_names
         ys = []
         for _, s in series_items:
             y_vals = s.get("y", [])
-            # Prefer max non-zero; fall back to first
-            nonzero = [v for v in y_vals if v]
-            ys.append(max(nonzero) if nonzero else (y_vals[0] if y_vals else 0))
+            nz = _nonzero_values(y_vals)
+            ys.append(max(nz) if nz else (y_vals[0] if y_vals else 0))
         return {"Value": {"x": xs, "y": ys}}
 
     return data
