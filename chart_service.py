@@ -42,6 +42,11 @@ def _normalize_series_data(data: dict) -> dict:
     B) Every series has AT MOST one non-zero y value (one bar per series
        spread across a shared x array — very common LLM mistake).
     C) No series name looks like a metric keyword (all category labels).
+
+    IMPORTANT early exit: if any series has >= 3 data points, we treat
+    the input as a legitimate multi-series comparison (e.g. YoY:
+    {"2022": {x: months, y: [12 vals]}, "2023": {...}, "2024": {...}})
+    and return it unchanged. Normalization only runs on SPARSE data.
     """
     if not isinstance(data, dict) or len(data) < 2:
         return data
@@ -51,6 +56,16 @@ def _normalize_series_data(data: dict) -> dict:
 
     def _nonzero_values(y_vals):
         return [v for v in y_vals if v]
+
+    # Early exit: if any series has >= 3 non-zero data points, treat as
+    # legit multi-series (e.g. YoY with 12 months per year). Sparse
+    # malformed data has only 0 or 1 non-zero value per series.
+    max_nonzero = max(
+        (len(_nonzero_values(s.get("y", []))) for _, s in series_items),
+        default=0,
+    )
+    if max_nonzero >= 3:
+        return data
 
     # Pattern A: every series is a single point
     if all(

@@ -151,9 +151,46 @@ WRONG — one series per category (produces broken charts):
 {"Black Friday 2025": {"x": ["Black Friday 2025"], "y": [377]}, "Prime Days 2024": {"x": [...], "y": [...]}}
 ```
 
-Only use multiple series when comparing DIFFERENT METRICS on the same x-axis (e.g. `{"Revenue": {...}, "Profit": {...}}`).
+Use multiple series when:
+- Comparing DIFFERENT METRICS on the same x-axis (e.g. `{"Revenue": {...}, "Profit": {...}}`)
+- Comparing the SAME metric across PERIODS (see Period-over-period section below)
 
 Always include a clear title and axis labels.
+
+## Period-over-period comparisons (YoY, MoM, WoW) — CRITICAL
+
+When the user asks to COMPARE the same metric across time periods
+(e.g. "registrations by month for 2022 vs 2023 vs 2024",
+ "revenue per quarter for 2023 vs 2024",
+ "orders per weekday this month vs last"):
+
+1. **SQL**: GROUP BY both the period-marker AND the x-axis granularity.
+   Example — monthly registrations per year:
+   ```
+   SELECT strftime('%Y', registration_date) AS year,
+          strftime('%m', registration_date) AS month,
+          COUNT(*) AS n
+   FROM customers
+   WHERE registration_date >= '2022-01-01' AND registration_date < '2025-01-01'
+   GROUP BY year, month
+   ORDER BY year, month
+   ```
+
+2. **Chart data**: ONE SERIES PER PERIOD, all sharing the SAME x axis:
+   ```
+   {
+     "2022": {"x": ["Jan","Feb","Mar",...,"Dec"], "y": [45, 38, 52, ..., 61]},
+     "2023": {"x": ["Jan","Feb","Mar",...,"Dec"], "y": [50, 42, 58, ..., 68]},
+     "2024": {"x": ["Jan","Feb","Mar",...,"Dec"], "y": [58, 47, 63, ..., 75]}
+   }
+   ```
+
+3. chart_type: "line" for trends (preferred) or "bar" for side-by-side.
+
+4. Each series name is the period identifier: the year ("2022"), quarter
+   label ("Q1 2024"), or a relative label ("Current", "Previous").
+
+5. Fill zeros for missing periods so all series have the SAME x length.
 """
 
 TOOLS = [
