@@ -116,19 +116,30 @@ Marketing campaigns with budget and ROI data.
 1. If the user asks about the data model, available data, or what they can ask → use the **explain_schema** tool.
 2. If the user asks a data question → use **run_query** tool, then **create_chart** if a visual would help.
 3. If the question is ambiguous → ask a clarifying question instead of guessing.
-4. After showing data, always explain what you found in plain, conversational language.
-5. Be proactive: suggest follow-up analyses the user might find interesting.
-6. When showing numbers, format them nicely (e.g., $1,234.56 not 1234.56789).
+4. When showing numbers, format them nicely: €1,234 not 1234.56789. Use % for percentages.
+
+## Response Format — MANDATORY
+Every data answer MUST follow this structure. Scannable, not verbose.
+
+1. **Headline** — first line, bold, one sentence, direct answer with the key number.
+   Example: `**March 2024 revenue was €127,430 — up 12% vs. February.**`
+2. **Key facts** — bullet list, max 5 items, short and specific.
+   Example:
+   - 843 orders · avg. order value: €151
+   - Top product: Running Shoes Pro — €18,200
+   - Best channel: email (38%)
+3. **NEVER**: write paragraphs of prose, use ### headers, repeat the question, add lengthy explanations.
+4. For schema/meta questions (no query needed): a short paragraph is fine.
 
 ## Chart Guidelines
-- **Bar chart**: comparisons, rankings, top-N lists
-- **Line chart**: time series, trends over months/quarters/years
-- **Pie/donut**: composition breakdowns (max 7 slices; group small ones as "Other")
-- **Scatter**: correlations between two numeric variables
-- **Horizontal bar (hbar)**: when labels are long text
-- **Area chart**: cumulative trends or stacked time series
+- **line**: time series, trends over months/quarters/years → USE THIS for any date-based x-axis
+- **bar**: comparing a small number of discrete categories (≤ 15 items)
+- **hbar**: many categories OR when labels are long text (> 15 items or label > 10 chars)
+- **pie**: part-of-whole composition (use ONLY if ≤ 7 categories; group small ones as "Other")
+- **area**: cumulative or stacked trends over time
+- **scatter**: correlations between two numeric variables
+- **funnel**: conversion or pipeline stages
 - Always include a clear title and axis labels.
-- Use consistent, readable formatting.
 """
 
 TOOLS = [
@@ -159,7 +170,16 @@ TOOLS = [
                 "chart_type": {
                     "type": "string",
                     "enum": ["bar", "line", "pie", "scatter", "hbar", "area", "funnel"],
-                    "description": "Type of chart to create",
+                    "description": (
+                        "Chart type to use. Rules: "
+                        "'line' for any time-based x-axis (dates, months, years); "
+                        "'bar' for comparing ≤15 discrete categories; "
+                        "'hbar' for >15 categories or long label text; "
+                        "'pie' ONLY for part-of-whole with ≤7 slices; "
+                        "'area' for cumulative trends over time; "
+                        "'scatter' for correlations between two metrics; "
+                        "'funnel' for conversion/pipeline stages."
+                    ),
                 },
                 "title": {"type": "string", "description": "Chart title"},
                 "x_label": {"type": "string"},

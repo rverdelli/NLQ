@@ -89,18 +89,24 @@ def build_plotly_config(tool_input: dict) -> dict:
             color_idx += 1
 
     elif chart_type == "hbar":
-        for name, series in data.items():
-            if not isinstance(series, dict):
-                continue
+        series_items = [(n, s) for n, s in data.items() if isinstance(s, dict)]
+        multi_series = len(series_items) > 1
+        for i, (name, series) in enumerate(series_items):
+            y_vals = series.get("x", series.get("y", []))
+            x_vals = series.get("y", series.get("x", []))
+            marker = (
+                {"color": COLORS[i % len(COLORS)], "opacity": 0.9}
+                if multi_series
+                else {"color": COLORS[:len(y_vals)], "opacity": 0.9}
+            )
             traces.append({
                 "type": "bar",
                 "orientation": "h",
                 "name": name,
-                "y": series.get("x", series.get("y", [])),
-                "x": series.get("y", series.get("x", [])),
-                "marker": {"color": COLORS[color_idx % len(COLORS)]},
+                "y": y_vals,
+                "x": x_vals,
+                "marker": marker,
             })
-            color_idx += 1
 
     elif chart_type == "funnel":
         for name, series in data.items():
@@ -116,26 +122,34 @@ def build_plotly_config(tool_input: dict) -> dict:
             color_idx += 1
 
     else:  # bar (default)
-        for name, series in data.items():
-            if not isinstance(series, dict):
-                continue
+        series_items = [(n, s) for n, s in data.items() if isinstance(s, dict)]
+        multi_series = len(series_items) > 1
+        for i, (name, series) in enumerate(series_items):
+            x_vals = series.get("x", [])
+            y_vals = series.get("y", [])
+            marker = (
+                {"color": COLORS[i % len(COLORS)], "opacity": 0.9}
+                if multi_series
+                else {"color": COLORS[:len(x_vals)], "opacity": 0.9}
+            )
             traces.append({
                 "type": "bar",
                 "name": name,
-                "x": series.get("x", []),
-                "y": series.get("y", []),
-                "marker": {"color": COLORS[color_idx % len(COLORS)]},
+                "x": x_vals,
+                "y": y_vals,
+                "marker": marker,
             })
-            color_idx += 1
 
     layout = {
-        "title": {"text": title, "font": {"size": 16}},
+        "title": {"text": title, "font": {"size": 16, "weight": "bold"}},
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(0,0,0,0)",
         "font": {"family": "Inter, system-ui, sans-serif", "color": "#e2e8f0"},
         "margin": {"l": 60, "r": 30, "t": 50, "b": 60},
         "showlegend": len(traces) > 1,
         "legend": {"orientation": "h", "y": -0.15},
+        "bargap": 0.25,
+        "bargroupgap": 0.08,
     }
 
     if chart_type not in ("pie", "funnel"):
@@ -143,10 +157,12 @@ def build_plotly_config(tool_input: dict) -> dict:
             "title": x_label,
             "gridcolor": "rgba(148,163,184,0.1)",
             "tickangle": -45 if chart_type != "hbar" else 0,
+            "linecolor": "rgba(148,163,184,0.2)",
         }
         layout["yaxis"] = {
             "title": y_label if chart_type != "hbar" else x_label,
             "gridcolor": "rgba(148,163,184,0.1)",
+            "linecolor": "rgba(148,163,184,0.2)",
         }
 
     return {"data": traces, "layout": layout}
