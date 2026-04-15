@@ -265,13 +265,15 @@ function renderMetaLayer(meta) {
             const isFK = !!col.references;
             const badge = isPK ? '<span class="meta-badge pk">PK</span>'
                         : isFK ? '<span class="meta-badge fk">FK</span>'
-                        : '';
+                        : '<span class="meta-badge empty"></span>';
             const li = document.createElement('li');
             li.className = 'meta-col-row';
             li.innerHTML = `
                 ${badge}
-                <span class="meta-col-name">${col.name}</span>
-                <span class="meta-col-type">${col.type}</span>
+                <div class="meta-col-info">
+                    <span class="meta-col-name">${col.name}</span>
+                    <span class="meta-col-type">${col.type}</span>
+                </div>
                 <span class="meta-col-desc">${col.description}</span>
             `;
             colList.appendChild(li);
