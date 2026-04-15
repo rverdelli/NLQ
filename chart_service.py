@@ -2,11 +2,22 @@
 import sys
 import json
 
-# Color palette
+# Color palette — Avvale brand (5 logo colors + complementary extensions
+# that stay within the green/teal family for visual consistency)
 COLORS = [
-    "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
-    "#f43f5e", "#f97316", "#eab308", "#22c55e", "#14b8a6",
-    "#06b6d4", "#3b82f6",
+    "#34A835",  # Avvale green
+    "#1E7A78",  # Avvale dark teal
+    "#4FB5A9",  # Avvale teal
+    "#B1D88A",  # Avvale pale green
+    "#6CA03B",  # Avvale dark green / overlap
+    # Extensions — tonal variations that blend with the brand
+    "#2D8A7E",  # deeper teal
+    "#8BC44B",  # lime-green
+    "#145F5D",  # very dark teal
+    "#7ECFC3",  # light teal
+    "#4C8A2E",  # forest green
+    "#A3CE6A",  # lighter lime
+    "#246B4A",  # dark forest
 ]
 
 

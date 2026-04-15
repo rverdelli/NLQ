@@ -1,5 +1,18 @@
 /* ===== CSS Variables ===== */
+/* Avvale brand palette (from logo):
+   --avvale-green-pale   #B1D88A
+   --avvale-green        #34A835
+   --avvale-green-dark   #6CA03B  (olive / overlap)
+   --avvale-teal         #4FB5A9
+   --avvale-teal-dark    #1E7A78
+*/
 :root {
+    --avvale-green-pale: #B1D88A;
+    --avvale-green:      #34A835;
+    --avvale-green-dark: #6CA03B;
+    --avvale-teal:       #4FB5A9;
+    --avvale-teal-dark:  #1E7A78;
+
     --bg-primary: #0f172a;
     --bg-secondary: #1e293b;
     --bg-tertiary: #334155;
@@ -8,14 +21,14 @@
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
     --border: #334155;
-    --accent: #6366f1;
-    --accent-hover: #818cf8;
-    --accent-subtle: rgba(99, 102, 241, 0.1);
-    --user-bubble: #6366f1;
+    --accent: #34A835;
+    --accent-hover: #46C047;
+    --accent-subtle: rgba(52, 168, 53, 0.12);
+    --user-bubble: #34A835;
     --user-text: #ffffff;
     --bot-bubble: #1e293b;
     --bot-text: #e2e8f0;
-    --success: #22c55e;
+    --success: #34A835;
     --warning: #f59e0b;
     --error: #ef4444;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -37,7 +50,7 @@
     --text-secondary: #475569;
     --text-muted: #94a3b8;
     --border: #e2e8f0;
-    --accent-subtle: rgba(99, 102, 241, 0.08);
+    --accent-subtle: rgba(52, 168, 53, 0.10);
     --bot-bubble: #ffffff;
     --bot-text: #1e293b;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -93,16 +106,16 @@ html, body {
 }
 
 .logo-icon {
-    color: #8b5cf6;
+    color: var(--avvale-green);
     flex-shrink: 0;
-    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
+    filter: drop-shadow(0 0 8px rgba(52, 168, 53, 0.35));
 }
 
 .logo {
     font-size: 1.35rem;
     font-weight: 800;
     letter-spacing: -0.01em;
-    background: linear-gradient(135deg, #6366f1, #a855f7);
+    background: linear-gradient(135deg, var(--avvale-green), var(--avvale-teal-dark));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -506,13 +519,13 @@ html, body {
 }
 
 .erd-rel-icon.out {
-    color: #6366f1;
-    background: rgba(99, 102, 241, 0.12);
+    color: var(--avvale-green);
+    background: rgba(52, 168, 53, 0.14);
 }
 
 .erd-rel-icon.in {
-    color: #14b8a6;
-    background: rgba(20, 184, 166, 0.12);
+    color: var(--avvale-teal);
+    background: rgba(79, 181, 169, 0.14);
 }
 
 .erd-rel-text {
@@ -545,13 +558,13 @@ html, body {
 /* Legend items for the new style */
 .legend-rel-out {
     font-weight: 700;
-    color: #6366f1;
+    color: var(--avvale-green);
     font-size: 1rem;
 }
 
 .legend-rel-in {
     font-weight: 700;
-    color: #14b8a6;
+    color: var(--avvale-teal);
     font-size: 1rem;
 }
 
@@ -1168,10 +1181,10 @@ html, body {
     color: #fff;
 }
 
-.rs-step-icon.sql    { background: #6366f1; }
-.rs-step-icon.chart  { background: #a855f7; }
-.rs-step-icon.db     { background: #f59e0b; }
-.rs-step-icon.text   { background: #14b8a6; }
+.rs-step-icon.sql    { background: var(--avvale-green); }
+.rs-step-icon.chart  { background: var(--avvale-teal-dark); }
+.rs-step-icon.db     { background: var(--avvale-green-dark); }
+.rs-step-icon.text   { background: var(--avvale-teal); }
 
 /* Label */
 .rs-step-label {
@@ -1427,7 +1440,7 @@ html, body {
 }
 
 .meta-col-row:hover {
-    background: rgba(99, 102, 241, 0.06);
+    background: rgba(52, 168, 53, 0.06);
 }
 
 .meta-col-info {
@@ -1455,13 +1468,13 @@ html, body {
 }
 
 .meta-badge.pk {
-    background: rgba(234, 179, 8, 0.2);
-    color: #eab308;
+    background: rgba(108, 160, 59, 0.22);
+    color: var(--avvale-green-dark);
 }
 
 .meta-badge.fk {
-    background: rgba(99, 102, 241, 0.2);
-    color: var(--accent);
+    background: rgba(79, 181, 169, 0.22);
+    color: var(--avvale-teal-dark);
 }
 
 .meta-col-name {
@@ -1628,15 +1641,18 @@ html, body {
 }
 
 .footer-logo {
-    height: 18px;
+    height: 20px;
     width: auto;
     display: inline-block;
-    color: var(--text-primary);
 }
 
-[data-theme="light"] .footer-logo {
-    color: #0f172a;
-}
+/* Default (dark mode): show light (white) logo, hide dark one */
+.footer-logo-dark { display: none; }
+.footer-logo-light { display: inline-block; }
+
+/* Light mode: show dark (black) logo, hide light one */
+[data-theme="light"] .footer-logo-dark { display: inline-block; }
+[data-theme="light"] .footer-logo-light { display: none; }
 
 .footer-brand-fallback {
     font-size: 0.82rem;
