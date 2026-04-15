@@ -116,6 +116,11 @@ function setupEventListeners() {
             closeSchemaModal();
         }
     });
+
+    // Modal tabs
+    document.querySelectorAll('.modal-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchModalTab(btn.dataset.tab));
+    });
 }
 
 // ===== Welcome Examples =====
@@ -154,6 +159,8 @@ async function loadSidebarSuggestions() {
 }
 
 // ===== Schema Modal & ERD =====
+let metaData = null;
+
 async function prefetchSchema() {
     try {
         const res = await fetch('/api/schema');
@@ -164,8 +171,20 @@ async function prefetchSchema() {
     }
 }
 
+async function prefetchMeta() {
+    if (metaData) return;
+    try {
+        const res = await fetch('/api/meta');
+        metaData = await res.json();
+    } catch (e) {
+        // Will retry when tab opens
+    }
+}
+
 function openSchemaModal() {
     schemaModalOverlay.classList.add('open');
+    // Ensure explorer tab is active on open
+    switchModalTab('explorer');
     if (schemaData) {
         renderERD(schemaData);
     } else {
@@ -175,10 +194,156 @@ function openSchemaModal() {
             else erdTables.innerHTML = '<p style="color:var(--error);padding:40px;text-align:center;">Could not load schema.</p>';
         });
     }
+    // Prefetch meta in background
+    prefetchMeta();
 }
 
 function closeSchemaModal() {
     schemaModalOverlay.classList.remove('open');
+}
+
+function switchModalTab(tab) {
+    document.querySelectorAll('.modal-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    document.getElementById('explorerPane').classList.toggle('active', tab === 'explorer');
+    document.getElementById('metaPane').classList.toggle('active', tab === 'meta');
+    document.getElementById('explorerFooter').style.display = tab === 'explorer' ? '' : 'none';
+    document.getElementById('metaFooter').style.display = tab === 'meta' ? '' : 'none';
+
+    const titleEl = document.getElementById('modalTitle');
+    const subtitleEl = document.getElementById('modalSubtitle');
+    if (tab === 'explorer') {
+        titleEl.textContent = 'Data Model Explorer';
+        subtitleEl.textContent = 'E-Commerce Database — tables, columns, and relationships';
+    } else {
+        titleEl.textContent = 'Meta Layer';
+        subtitleEl.textContent = 'Informazioni funzionali usate dal sistema per generare le query SQL';
+        if (metaData) {
+            renderMetaLayer(metaData);
+        } else {
+            document.getElementById('metaContent').innerHTML =
+                '<p style="color:var(--text-muted);padding:40px;text-align:center;">Loading...</p>';
+            prefetchMeta().then(() => {
+                if (metaData) renderMetaLayer(metaData);
+            });
+        }
+    }
+}
+
+// ─── Meta Layer renderer ──────────────────────────────────────────────────────
+
+function renderMetaLayer(meta) {
+    const root = document.getElementById('metaContent');
+    if (root.dataset.rendered === 'true') return; // already rendered, skip
+    root.innerHTML = '';
+    root.dataset.rendered = 'true';
+
+    // ── Section: Tabelle e Campi ──────────────────────────────────────────────
+    root.appendChild(metaSectionHeader('Tabelle e Campi', 'Struttura delle tabelle con significato di ogni colonna'));
+
+    const tableGrid = document.createElement('div');
+    tableGrid.className = 'meta-table-grid';
+    (meta.tables || []).forEach(table => {
+        const card = document.createElement('div');
+        card.className = 'meta-table-card';
+
+        // Header
+        card.innerHTML = `
+            <div class="meta-table-head">
+                <span class="meta-table-name">${table.name}</span>
+                <span class="meta-table-count">${table.row_count.toLocaleString()} righe</span>
+            </div>
+            <p class="meta-table-desc">${table.description}</p>
+        `;
+
+        // Columns list
+        const colList = document.createElement('ul');
+        colList.className = 'meta-col-list';
+        table.columns.forEach(col => {
+            const isPK = col.name === 'id';
+            const isFK = !!col.references;
+            const badge = isPK ? '<span class="meta-badge pk">PK</span>'
+                        : isFK ? '<span class="meta-badge fk">FK</span>'
+                        : '';
+            const li = document.createElement('li');
+            li.className = 'meta-col-row';
+            li.innerHTML = `
+                ${badge}
+                <span class="meta-col-name">${col.name}</span>
+                <span class="meta-col-type">${col.type}</span>
+                <span class="meta-col-desc">${col.description}</span>
+            `;
+            colList.appendChild(li);
+        });
+        card.appendChild(colList);
+        tableGrid.appendChild(card);
+    });
+    root.appendChild(tableGrid);
+
+    // ── Section: Relazioni ────────────────────────────────────────────────────
+    root.appendChild(metaSectionHeader('Relazioni tra Tabelle', 'Foreign key e come le tabelle sono connesse'));
+
+    const relGrid = document.createElement('div');
+    relGrid.className = 'meta-rel-grid';
+    (meta.relationships || []).forEach(rel => {
+        const item = document.createElement('div');
+        item.className = 'meta-rel-item';
+        item.innerHTML = `
+            <div class="meta-rel-path">
+                <span class="meta-rel-table">${rel.from_table}</span>
+                <span class="meta-rel-col">.${rel.from_col}</span>
+                <span class="meta-rel-arrow">→</span>
+                <span class="meta-rel-table">${rel.to_table}</span>
+                <span class="meta-rel-col">.${rel.to_col}</span>
+            </div>
+            <p class="meta-rel-label">${rel.label}</p>
+        `;
+        relGrid.appendChild(item);
+    });
+    root.appendChild(relGrid);
+
+    // ── Section: Pattern JOIN ─────────────────────────────────────────────────
+    root.appendChild(metaSectionHeader('Pattern JOIN Comuni', 'Template SQL usati per le analisi più frequenti'));
+
+    const jpGrid = document.createElement('div');
+    jpGrid.className = 'meta-jp-grid';
+    (meta.join_patterns || []).forEach(jp => {
+        const item = document.createElement('div');
+        item.className = 'meta-jp-item';
+        item.innerHTML = `
+            <p class="meta-jp-label">${jp.label}</p>
+            <pre class="meta-jp-sql">${escHtml(jp.sql)}</pre>
+        `;
+        jpGrid.appendChild(item);
+    });
+    root.appendChild(jpGrid);
+
+    // ── Section: Note di Sistema ──────────────────────────────────────────────
+    root.appendChild(metaSectionHeader('Note di Sistema', 'Vincoli e convenzioni che il modello conosce sul dataset'));
+
+    const notesList = document.createElement('ul');
+    notesList.className = 'meta-notes-list';
+    (meta.system_notes || []).forEach(note => {
+        const li = document.createElement('li');
+        li.textContent = note;
+        notesList.appendChild(li);
+    });
+    root.appendChild(notesList);
+}
+
+function metaSectionHeader(title, subtitle) {
+    const el = document.createElement('div');
+    el.className = 'meta-section-header';
+    el.innerHTML = `<h3 class="meta-section-title">${title}</h3><p class="meta-section-sub">${subtitle}</p>`;
+    return el;
+}
+
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 // Build lookup: tableName → list of { col, refTable, refCol, direction }

@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from models import ChatRequest, ChatResponse, QueryInfo, SchemaResponse
-from database import get_schema_info
+from database import get_schema_info, get_meta_layer
 from claude_service import chat, chat_stream
 
 app = FastAPI(title="DataChat — E-Commerce Analytics Assistant")
@@ -38,6 +38,11 @@ def get_suggestions():
             "Show me customer registrations over time",
         ]
     }
+
+
+@app.get("/api/meta")
+def get_meta():
+    return get_meta_layer()
 
 
 @app.post("/api/chat/stream")

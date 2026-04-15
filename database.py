@@ -211,3 +211,59 @@ def get_relationships_text() -> str:
 - Revenue by Product: SUM(order_items.total_price) grouped by product
 - Revenue by Category: JOIN products → categories, SUM total_price
 """
+
+
+# Structured FK relationships for the Meta Layer UI
+RELATIONSHIPS = [
+    {"from_table": "orders", "from_col": "customer_id", "to_table": "customers", "to_col": "id",
+     "label": "Ogni ordine appartiene a un cliente"},
+    {"from_table": "order_items", "from_col": "order_id", "to_table": "orders", "to_col": "id",
+     "label": "Ogni riga d'ordine appartiene a un ordine"},
+    {"from_table": "order_items", "from_col": "product_id", "to_table": "products", "to_col": "id",
+     "label": "Ogni riga d'ordine fa riferimento a un prodotto"},
+    {"from_table": "products", "from_col": "category_id", "to_table": "categories", "to_col": "id",
+     "label": "Ogni prodotto appartiene a una categoria"},
+    {"from_table": "reviews", "from_col": "product_id", "to_table": "products", "to_col": "id",
+     "label": "Ogni recensione riguarda un prodotto"},
+    {"from_table": "reviews", "from_col": "customer_id", "to_table": "customers", "to_col": "id",
+     "label": "Ogni recensione è scritta da un cliente"},
+]
+
+JOIN_PATTERNS = [
+    {"label": "Ordini + Clienti",
+     "sql": "orders o JOIN customers c ON o.customer_id = c.id"},
+    {"label": "Ordini + Prodotti + Categorie",
+     "sql": "order_items oi\n  JOIN orders o ON oi.order_id = o.id\n  JOIN products p ON oi.product_id = p.id\n  JOIN categories cat ON p.category_id = cat.id"},
+    {"label": "Fatturato per prodotto",
+     "sql": "SELECT p.name, SUM(oi.total_price) AS revenue\nFROM order_items oi\nJOIN products p ON oi.product_id = p.id\nGROUP BY p.id"},
+    {"label": "Fatturato per categoria",
+     "sql": "SELECT cat.name, SUM(oi.total_price) AS revenue\nFROM order_items oi\nJOIN products p ON oi.product_id = p.id\nJOIN categories cat ON p.category_id = cat.id\nGROUP BY cat.id"},
+    {"label": "ROI campagna marketing",
+     "sql": "SELECT name,\n  revenue_attributed / NULLIF(budget, 0) AS roi\nFROM campaigns\nORDER BY roi DESC"},
+    {"label": "Registrazioni mensili per anno (YoY)",
+     "sql": "SELECT strftime('%Y', registration_date) AS year,\n       strftime('%m', registration_date) AS month,\n       COUNT(*) AS n\nFROM customers\nGROUP BY year, month\nORDER BY year, month"},
+]
+
+SYSTEM_NOTES = [
+    "Le query usano solo SELECT — nessuna modifica ai dati è permessa.",
+    "I campi data seguono il formato ISO 8601 (YYYY-MM-DD); per estrarre anno/mese si usa strftime('%Y', campo).",
+    "order_items.total_price è già calcolato (quantità × prezzo × sconto); usarlo per il fatturato.",
+    "Il campo lifetime_value in customers è pre-aggregato su ordini completed/shipped.",
+    "I valori di orders.status sono: completed, shipped, processing, cancelled, returned.",
+    "I segmenti cliente sono: Consumer, Corporate, Home Office.",
+    "I canali campagna sono: email, social_media, google_ads, influencer.",
+    "I metodi di pagamento sono: credit_card, paypal, bank_transfer, crypto.",
+    "I paesi disponibili sono: Italy, Germany, France, USA, UK, Spain, Japan, Canada, Australia.",
+    "Le categorie prodotto sono: Electronics, Clothing, Home & Kitchen, Books, Sports.",
+]
+
+
+def get_meta_layer() -> dict:
+    """Return all metadata used by the system to generate queries."""
+    tables = get_schema_info()
+    return {
+        "tables": tables,
+        "relationships": RELATIONSHIPS,
+        "join_patterns": JOIN_PATTERNS,
+        "system_notes": SYSTEM_NOTES,
+    }
