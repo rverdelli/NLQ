@@ -8,7 +8,7 @@ from models import ChatRequest, ChatResponse, QueryInfo, SchemaResponse
 from database import get_schema_info, get_meta_layer
 from claude_service import chat, chat_stream
 
-app = FastAPI(title="DataChat — E-Commerce Analytics Assistant")
+app = FastAPI(title="Atlas — L'atlante dei tuoi dati")
 
 
 @app.get("/api/health")

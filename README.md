@@ -1,4 +1,6 @@
-# DataChat — E-Commerce Analytics Assistant
+# Atlas — L'atlante dei tuoi dati
+
+*Powered by Avvale*
 
 A full-stack data chatbot that lets users ask natural language questions about an e-commerce database and receive SQL-powered answers with auto-generated interactive charts.
 

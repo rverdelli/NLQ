@@ -86,9 +86,22 @@ html, body {
     gap: 8px;
 }
 
+.logo-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo-icon {
+    color: #8b5cf6;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
+}
+
 .logo {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
     background: linear-gradient(135deg, #6366f1, #a855f7);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1577,4 +1590,55 @@ html, body {
     font-size: 0.79rem;
     color: var(--text-secondary);
     line-height: 1.5;
+}
+
+/* ===== App footer: Powered by Avvale ===== */
+.app-footer {
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 8px 16px;
+}
+
+.footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.footer-text {
+    opacity: 0.85;
+}
+
+.footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 700;
+    transition: opacity 0.15s;
+}
+
+.footer-brand:hover {
+    opacity: 0.75;
+}
+
+.footer-logo {
+    height: 18px;
+    width: auto;
+    display: inline-block;
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .footer-logo {
+    color: #0f172a;
+}
+
+.footer-brand-fallback {
+    font-size: 0.82rem;
+    letter-spacing: 0.06em;
 }

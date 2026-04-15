@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataChat — E-Commerce Analytics Assistant</title>
+    <title>Atlas — L'atlante dei tuoi dati</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
@@ -15,8 +15,15 @@
                 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
-                <h1 class="logo">DataChat</h1>
-                <span class="logo-subtitle">E-Commerce Analytics Assistant</span>
+                <div class="logo-group">
+                    <svg class="logo-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M2 12h20"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <h1 class="logo">Atlas</h1>
+                </div>
+                <span class="logo-subtitle">L'atlante dei tuoi dati</span>
             </div>
             <div class="header-right">
                 <button class="reasoning-toggle-btn" id="reasoningToggleBtn" aria-label="Toggle reasoning panel">
@@ -51,8 +58,8 @@
                         <div class="welcome-icon">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         </div>
-                        <h2>Welcome to DataChat!</h2>
-                        <p>I'm your e-commerce analytics assistant. I can help you explore sales data, customer behavior, product performance, and marketing campaigns from 2023–2025.</p>
+                        <h2>Benvenuto in Atlas</h2>
+                        <p>Sono il tuo atlante dei dati e-commerce. Posso aiutarti a esplorare vendite, clienti, prodotti e campagne marketing dal 2023 al 2025 — basta che mi faccia una domanda in linguaggio naturale.</p>
                         <p class="welcome-hint">Try asking me:</p>
                         <div class="welcome-examples" id="welcomeExamples"></div>
                         <p class="welcome-tip">Tip: You can also ask me <a href="#" class="example-link" data-question="What data do you have?">"What data do you have?"</a> to explore the full data model.</p>
@@ -93,6 +100,17 @@
                 </div>
             </aside>
         </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-inner">
+                <span class="footer-text">Powered by</span>
+                <a href="https://avvale.com" target="_blank" rel="noopener" class="footer-brand" aria-label="Avvale">
+                    <img src="/static/avvale-logo.svg" alt="Avvale" class="footer-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';">
+                    <span class="footer-brand-fallback" style="display:none">Avvale</span>
+                </a>
+            </div>
+        </footer>
     </div>
 
     <!-- Overlay for mobile sidebar -->
