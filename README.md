@@ -1,4 +1,4 @@
-# Atlas — L'atlante dei tuoi dati
+# Atlas — Chart your data
 
 *Powered by Avvale*
 
